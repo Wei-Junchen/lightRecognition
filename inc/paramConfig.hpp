@@ -21,7 +21,7 @@ struct HsvParam
 class HsvParamManager
 {
 public:
-    HsvParamManager(std::vector<std::string_view> colorRangeNames): filename("hsv_params")
+    HsvParamManager(std::vector<std::string_view> colorRangeNames): filename("../config/hsv_params")
     {
         for(auto name : colorRangeNames)
         {
