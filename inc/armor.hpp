@@ -52,34 +52,114 @@ public:
         cv::Point2f direction = (light2.center - light1.center) / cv::norm(light2.center - light1.center);
         cv::Point2f perpendicular(-direction.y, direction.x); //垂直方向单位向量    
         float max_width = std::max(light1.size.width, light2.size.width);
-        box.vertices[0] = light1.center - perpendicular * max_width * 1.2f;
-        box.vertices[1] = light1.center + perpendicular * max_width * 1.2f;
-        box.vertices[2] = light2.center + perpendicular * max_width * 1.2f;
-        box.vertices[3] = light2.center - perpendicular * max_width * 1.2f;
+        
+        cv::Point2f tempVertices[4];
+        tempVertices[0] = light1.center - perpendicular * max_width * 1.2f;
+        tempVertices[1] = light1.center + perpendicular * max_width * 1.2f;
+        tempVertices[2] = light2.center + perpendicular * max_width * 1.2f;
+        tempVertices[3] = light2.center - perpendicular * max_width * 1.2f;
 
+        //box.vertices顺序重排，确保顺时针旋转
+        int x[4],y[4];
+        x[0] = 0;
+        for(int i = 1; i < 4; i++)
+        {
+            for(int j = 0; j<i; ++j)
+            {
+                if(tempVertices[i].x <tempVertices[x[j]].x)
+                {
+                    for(int k = i; k>j; --k)
+                        x[k] = x[k-1];
+                    x[j] = i;
+                    break;
+                }
+                if(j == i-1)
+                    x[i] = i;
+            }    
+        }
+        y[0] = 0;
+        for(int i = 1; i < 4; i++)
+        {
+            for(int j = 0; j<i; ++j)
+            {
+                if(tempVertices[i].y <tempVertices[y[j]].y)
+                {
+                    for(int k = i; k>j; --k)
+                        y[k] = y[k-1];
+                    y[j] = i;
+                    break;
+                }
+                if(j == i-1)
+                    y[i] = i;
+            }    
+        }
+
+        //先确定左半边,必定是x坐标最小的两个点，再确定上下位置，求交集
+
+        if(x[0] == y[0]) //x[0]是左上
+        {
+            box.vertices[0] = tempVertices[x[0]];
+            box.vertices[3] = tempVertices[x[1]];
+            box.vertices[1] = tempVertices[y[1]];
+            box.vertices[2] = tempVertices[6 - x[0] - x[1] - y[1]];
+        }
+        else if(x[0] == y[1]) //x[0]是左上
+        {
+            box.vertices[0] = tempVertices[x[0]];
+            box.vertices[3] = tempVertices[x[1]];
+            box.vertices[1] = tempVertices[y[0]];
+            box.vertices[2] = tempVertices[6 - x[0] - x[1] - y[0]];
+        }
+        else if(x[1] == y[0]) //x[1]是左上
+        {
+            box.vertices[0] = tempVertices[x[1]];
+            box.vertices[3] = tempVertices[x[0]];
+            box.vertices[1] = tempVertices[y[1]];
+            box.vertices[2] = tempVertices[6 - x[0] - x[1] - y[1]];
+        }
+        else if(x[1] == y[1]) //x[1]是左上
+        {
+            box.vertices[3] = tempVertices[x[0]];
+            box.vertices[0] = tempVertices[x[1]];
+            box.vertices[1] = tempVertices[y[0]];
+            box.vertices[2] = tempVertices[6 - x[0] - x[1] - y[0]];
+        }
+        
+
+        //裁减装甲板图像
+        cv::Mat mask = cv::Mat::zeros(box.size.height, box.size.width, CV_8UC1);
+        cv::Point2f src_points[4] = {
+            box.vertices[0], box.vertices[1], box.vertices[2], box.vertices[3]
+        };
+        //转换为CNN输入大小
+        cv::Point2f dst_points[4] = {
+            {0,0},{CNN_INPUT_SIZE,0},{CNN_INPUT_SIZE,CNN_INPUT_SIZE},{0,CNN_INPUT_SIZE}
+        };
+        cv::Mat perspectiveTransform = cv::getPerspectiveTransform(src_points, dst_points);
+        cv::warpPerspective(*frame, box_image, perspectiveTransform, cv::Size(CNN_INPUT_SIZE, CNN_INPUT_SIZE));
+
+        cv::namedWindow("box_image", cv::WINDOW_NORMAL);
+        cv::imshow("box_image", box_image);
         id = getId();
     }
     //获取装甲板ID，使用CNN识别，用DNN导入模型
     int getId()
     {
-        //转换为CNN输入大小
-        cv::Point2f dst_points[4] = {
-            cv::Point(0, 0),
-            cv::Point(box.size.width - 1, 0),
-            cv::Point(box.size.width - 1, box.size.height - 1),
-            cv::Point(0, box.size.height - 1)
-        };
-
-        //先透视变换得到正面图像
-        cv::Mat perspectiveTransform = cv::getPerspectiveTransform(box.vertices, dst_points);
-        cv::Mat warped;
         return 0;
     }
     ~Armor() = default;
+    
+    static void setFrame(std::shared_ptr<cv::Mat> f)
+    {
+        Armor::frame = f;
+    }
 
 private:
+
     int type; // 0 for blue, 1 for red
     int id;
+    inline static std::shared_ptr<cv::Mat> frame = nullptr; //当前帧图像
+    cv::Mat box_image; //装甲板的图像，用于CNN识别 
     MyRotatedRect box; //装甲板的最小外接矩形
     MyRotatedRect lights[2];
 };

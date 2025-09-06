@@ -31,6 +31,7 @@ int main(int argc,char** argv)
 #endif
 
     std::shared_ptr<cv::Mat> frame = std::make_shared<cv::Mat>();
+    Armor::setFrame(frame);
 
     auto blue_recong = Recognition::createRecognition(hsv_param_blue, frame, 0);
     auto red_recong = Recognition::createRecognition(hsv_param_red, frame, 1);
@@ -77,7 +78,7 @@ int main(int argc,char** argv)
             std::cout << "Esc key is pressed by user. Stopping the video" << std::endl;
             break;
         }
-        // cv::waitKey(0);
+        // cv::waitKey(0)
     }
     return 0;
 }

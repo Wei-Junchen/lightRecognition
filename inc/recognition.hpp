@@ -120,7 +120,7 @@ public:
                         cv::Scalar(hsv_param.hue_max, hsv_param.saturation_max, hsv_param.value_max),
                         out_img);
         }
-        cv::imshow("After inRange", out_img);
+        // cv::imshow("After inRange", out_img);
         //图像进行中值滤波
         cv::medianBlur(out_img, out_img, 7);
 

@@ -4,7 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
 
-#define SIZE 36
+#define CNN_INPUT_SIZE 36
 #define CLASS_NUM 11 // Number of classes in the model (10 digits + 1 for no digit)
 #define ONNX_MODEL_PATH "model.onnx"
 
@@ -20,7 +20,7 @@ public:
     int predict(const cv::Mat& input)
     {
         // Preprocess the input image
-        cv::Mat blob = cv::dnn::blobFromImage(input, 1.0, cv::Size(SIZE, SIZE), cv::Scalar(104, 117, 123));
+        cv::Mat blob = cv::dnn::blobFromImage(input, 1.0, cv::Size(CNN_INPUT_SIZE, CNN_INPUT_SIZE), cv::Scalar(104, 117, 123));
         net.setInput(blob);
 
         // Forward pass
