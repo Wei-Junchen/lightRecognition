@@ -4,7 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 
-#define PARAM_CONFIG_DEBUG false
+#define PARAM_CONFIG_DEBUG true
 #define COLOR_NUM_MAX 2
 
 struct HsvParam

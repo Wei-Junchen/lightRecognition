@@ -78,7 +78,7 @@ int main(int argc,char** argv)
             std::cout << "Esc key is pressed by user. Stopping the video" << std::endl;
             break;
         }
-        // cv::waitKey(0)
+        // cv::waitKey(0);
     }
     return 0;
 }

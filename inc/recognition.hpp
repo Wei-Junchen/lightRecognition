@@ -46,6 +46,9 @@ namespace
         if(box1.angle < 10.0f || box1.angle > 170.0f || box2.angle < 10.0f || box2.angle >170.0f)
             return false;
 
+        if(box1.size.width/box1.size.height > 7.5f || box2.size.width/box2.size.height > 7.5f)
+            return false;
+
         //判断是否满足匹配条件
         if(center_dist > avg_width * 5.0f || center_dist < avg_width * 1.5f)
             return false;
@@ -58,7 +61,7 @@ namespace
 
         if(std::abs(angle_diff1) < 85.0f || std::abs(angle_diff2) < 85.0f)
             return false;
-
+        
         return true;
     }
 }
