@@ -145,7 +145,8 @@ public:
         {
             //使用最小外接平行四边形
             cv::RotatedRect box = cv::minAreaRect(contour);
-
+            if(box.size.area() < 20.0f) //面积太小的去掉
+                continue;
             MyRotatedRect mybox;
             box.points(mybox.vertices);
 

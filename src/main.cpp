@@ -32,7 +32,7 @@ int main(int argc,char** argv)
 
     std::shared_ptr<cv::Mat> frame = std::make_shared<cv::Mat>();
     Armor::setFrame(frame);
-
+    ArmorFilter armorFilter;
     auto blue_recong = Recognition::createRecognition(hsv_param_blue, frame, 0);
     auto red_recong = Recognition::createRecognition(hsv_param_red, frame, 1);
 
@@ -62,8 +62,9 @@ int main(int argc,char** argv)
         std::vector<Armor> armors;
         blue_recong->getArmor(armors);
         red_recong->getArmor(armors);
+        armorFilter.updateArmor(armors);
 
-        Armor::DrawArmor(*frame, armors);
+        Armor::DrawArmor(*frame, armorFilter.getFocusedArmors());
 
         if (elapsed.count() > 0)
         {

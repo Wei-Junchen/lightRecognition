@@ -57,11 +57,14 @@ namespace
 
 class Armor
 {
+    friend class ArmorFilter;
 public:
-    static void DrawArmor(cv::Mat& img, std::vector<Armor>& armors)
+    static void DrawArmor(cv::Mat& img,const std::vector<Armor>& armors)
     {
         for(const auto& armor : armors)
         {
+            if(armor.is_detected == false)
+                continue;
             //画出两个灯条
             for(int i = 0; i < 4; i++)
                 cv::line(img, armor.lights[0].vertices[i], armor.lights[0].vertices[(i+1)%4], cv::Scalar(0, 255, 0), 2);
@@ -89,6 +92,7 @@ public:
                         cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 255), 2);
         }
     }
+    Armor() = default;
     Armor(MyRotatedRect light1, MyRotatedRect light2, int type): type(type)
     {
         if(light1.center.x == light2.center.x)
@@ -156,7 +160,8 @@ public:
                                                             (lights[1].vertices[0] + lights[1].vertices[1])/2.0,lights[1].center,(lights[1].vertices[3]+lights[1].vertices[2])/2.0},
                       K, dicoef, rvec, tvec);
         center_distance = cv::norm(tvec);
-        std::cout<<"center_distance:" << center_distance << std::endl;
+        // std::cout<<"tvec: "<<tvec<<std::endl;
+        // std::cout<<"center_distance:" << center_distance << std::endl;
     }
     //获取装甲板ID，使用CNN识别，用DNN导入模型
     int getId()
@@ -171,7 +176,7 @@ public:
     }
 
 private:
-
+    bool is_detected;
     int type; // 0 for blue, 1 for red
     int id;
     inline static std::shared_ptr<cv::Mat> frame = nullptr; //当前帧图像
@@ -182,8 +187,188 @@ private:
     cv::Mat tvec;   //平移向量
     float center_distance;
     inline static size_t totalArmor = 0; //总识别到的装甲板数
+    float vx, vy; //速度
 };
 
 
+float dt = 1; //时间间隔
+
+//定义armor的状态空间(cx,cy,h,w,vx,vy)
+cv::Mat state = (cv::Mat_<float>(6,1) << 0,0,0,0,0,0);
+
+//定义状态转移矩阵
+cv::Mat transitionMatrix = (cv::Mat_<float>(6,6) <<
+    1,0,0,0,dt,0,
+    0,1,0,0,0,dt,
+    0,0,1,0,0,0,
+    0,0,0,1,0,0,
+    0,0,0,0,1,0,
+    0,0,0,0,0,1);
+
+//定义测量矩阵
+cv::Mat measurementMatrix = (cv::Mat_<float>(4,6) <<
+    1,0,0,0,0,0,
+    0,1,0,0,0,0,
+    0,0,1,0,0,0,
+    0,0,0,1,0,0);
+//定义测量噪声协方差矩阵
+cv::Mat measurementNoiseCov = (cv::Mat_<float>(4,4) <<
+    1,0,0,0,
+    0,1,0,0,
+    0,0,1,0,
+    0,0,0,1);
+
+//定义协方差噪声矩阵
+cv::Mat processNoiseCov = (cv::Mat_<float>(6,6) <<
+    1,0,0,0,0,0,
+    0,1,0,0,0,0,
+    0,0,1,0,0,0,
+    0,0,0,1,0,0,
+    0,0,0,0,1,0,
+    0,0,0,0,0,1);
+
+class ArmorFilter
+{
+public:
+    void updateArmor(std::vector<Armor>& detectedArmors)
+    {
+        //先对已跟踪的装甲板进行预测
+        for(int i=0;i<focusedArmors.size();++i)
+        {
+            lostCount[i]++;
+            cv::KalmanFilter& kf = kalmanFilters[i];
+            cv::Mat prediction = kf.predict();
+            focusedArmors[i].box.center.x = prediction.at<float>(0);
+            focusedArmors[i].box.center.y = prediction.at<float>(1);
+            focusedArmors[i].box.size.width = prediction.at<float>(2);
+            focusedArmors[i].box.size.height = prediction.at<float>(3);
+            focusedArmors[i].vx = prediction.at<float>(4);
+            focusedArmors[i].vy = prediction.at<float>(5);
+            std::cout<<"predicted pos: "<<focusedArmors[i].box.center<<std::endl;
+            std::cout<<"predicted v: "<<focusedArmors[i].vx<<","<<focusedArmors[i].vy<<std::endl;
+        }
+        //将检测到的装甲板与已跟踪的装甲板进行匹配
+        std::vector<bool> matched(detectedArmors.size(), false);
+        for(auto& armor : focusedArmors)
+        {
+            float min_distance = 300.0f;
+            int min_index = -1;
+            for(size_t i = 0; i < detectedArmors.size(); i++)
+            {
+                if(matched[i]) continue;
+                std::cout<<"center: "<<armor.box.center<<" " <<detectedArmors[i].box.center<<std::endl;
+                float distance = cv::norm(armor.box.center - detectedArmors[i].box.center);
+                std::cout<<"distance: "<<distance<<std::endl;
+                if(distance < min_distance)
+                {
+                    min_distance = distance;
+                    min_index = i;
+                }
+            }
+            if(min_index != -1)
+            {
+                lostCount[&armor - &focusedArmors[0]] = 0; //重置丢失计数器
+                matched[min_index] = true;
+                //加上观测值再次更新kalman
+                cv::KalmanFilter& kf = kalmanFilters[&armor - &focusedArmors[0]];
+
+                cv::Mat measurement = (cv::Mat_<float>(4,1) << detectedArmors[min_index].box.center.x,
+                                       detectedArmors[min_index].box.center.y,
+                                       detectedArmors[min_index].box.size.width,
+                                       detectedArmors[min_index].box.size.height);
+
+                cv::Mat estimated = kf.correct(measurement);
+                armor.box.center.x = estimated.at<float>(0);
+                armor.box.center.y = estimated.at<float>(1);
+                armor.box.size.width = estimated.at<float>(2);
+                armor.box.size.height = estimated.at<float>(3);
+                armor.vx = estimated.at<float>(4);
+                armor.vy = estimated.at<float>(5);
+                //更新其他信息
+                armor.lights[0] = detectedArmors[min_index].lights[0];
+                armor.lights[1] = detectedArmors[min_index].lights[1];
+                armor.box.vertices[0] = detectedArmors[min_index].box.vertices[0];
+                armor.box.vertices[1] = detectedArmors[min_index].box.vertices[1];
+                armor.box.vertices[2] = detectedArmors[min_index].box.vertices[2];
+                armor.box.vertices[3] = detectedArmors[min_index].box.vertices[3];
+                armor.rvec = detectedArmors[min_index].rvec;
+                armor.tvec = detectedArmors[min_index].tvec;
+                armor.center_distance = detectedArmors[min_index].center_distance;
+                armor.id = detectedArmors[min_index].id;
+            }
+        }
+        //删除丢失超过5帧的装甲板
+        for(int i = lostCount.size() - 1; i >= 0; i--)
+        {
+            if(lostCount[i] != 0)
+            {
+                if(lostCount[i] > 2)
+                {
+                    lostCount.erase(lostCount.begin() + i);
+                    kalmanFilters.erase(kalmanFilters.begin() + i);
+                    focusedArmors.erase(focusedArmors.begin() + i);
+                }
+                //丢失未超过2帧，kalman继续预测
+                else
+                {
+                    cv::KalmanFilter& kf = kalmanFilters[i];
+                    cv::Mat prediction = kf.predict();
+                    focusedArmors[i].box.center.x = prediction.at<float>(0);
+                    focusedArmors[i].box.center.y = prediction.at<float>(1);
+                    focusedArmors[i].box.size.width = prediction.at<float>(2);
+                    focusedArmors[i].box.size.height = prediction.at<float>(3);
+                    focusedArmors[i].vx = prediction.at<float>(4);
+                    focusedArmors[i].vy = prediction.at<float>(5);
+                    focusedArmors[i].is_detected = false;
+                    // focusedArmors[i].lights[0].center.x = prediction.at<float>(0) - focusedArmors[i].box.size.width / 2;
+                    // focusedArmors[i].lights[0].center.y = prediction.at<float>(1);
+                    // focusedArmors[i].lights[1].center.x = prediction.at<float>(0) + focusedArmors[i].box.size.width / 2;
+                    // focusedArmors[i].lights[1].center.y = prediction.at<float>(1);
+                    // focusedArmors[i].box.vertices[0] = focusedArmors[i].lights[0].center - cv::Point2f(focusedArmors[i].box.size.width / 2, focusedArmors[i].box.size.height / 2);
+                    // focusedArmors[i].box.vertices[3] = focusedArmors[i].lights[0].center + cv::Point2f(focusedArmors[i].box.size.width / 2, focusedArmors[i].box.size.height / 2);
+                    // focusedArmors[i].box.vertices[1] = focusedArmors[i].lights[1].center - cv::Point2f(focusedArmors[i].box.size.width / 2, focusedArmors[i].box.size.height / 2);
+                    // focusedArmors[i].box.vertices[2] = focusedArmors[i].lights[1].center + cv::Point2f(focusedArmors[i].box.size.width / 2, focusedArmors[i].box.size.height / 2);
+                }
+            }
+            else
+            {
+                focusedArmors[i].is_detected = true;
+            }
+        }
+
+        //将未匹配的检测到的装甲板加入跟踪列表
+        for(size_t i = 0; i < detectedArmors.size(); i++)
+        {
+            if(!matched[i])
+            {
+                //初始化kalman滤波器
+                cv::KalmanFilter kf(6,4,0);
+                kf.transitionMatrix = transitionMatrix;
+                kf.measurementMatrix = measurementMatrix;
+                kf.processNoiseCov = processNoiseCov;
+                kf.measurementNoiseCov = measurementNoiseCov;
+                cv::Mat state = (cv::Mat_<float>(6,1) << detectedArmors[i].box.center.x, detectedArmors[i].box.center.y, 
+                                 detectedArmors[i].box.size.width, detectedArmors[i].box.size.height, 0, 0);
+                // 初始化statePost
+                kf.statePost = state.clone();
+                // 初始化后验协方差
+                setIdentity(kf.errorCovPost, cv::Scalar::all(1));
+
+                lostCount.push_back(0);
+                kalmanFilters.push_back(kf);
+                focusedArmors.push_back(detectedArmors[i]);
+                // std::cout<<"new armor added, pos:"<<detectedArmors[i].box.center<<std::endl;
+            }
+        }
+    }
+    const std::vector<Armor>& getFocusedArmors() const
+    {
+        return focusedArmors;
+    }
+private:
+    std::vector<Armor> focusedArmors; //当前跟踪的装甲板
+    std::vector<cv::KalmanFilter> kalmanFilters; //对应的Kalman滤波器
+    std::vector<int> lostCount; //丢失计数器
+};
 
 #endif
