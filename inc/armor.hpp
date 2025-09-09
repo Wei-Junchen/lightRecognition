@@ -191,7 +191,7 @@ private:
 };
 
 
-float dt = 1; //时间间隔
+float dt = 0.05; //时间间隔
 
 //定义armor的状态空间(cx,cy,h,w,vx,vy)
 cv::Mat state = (cv::Mat_<float>(6,1) << 0,0,0,0,0,0);
@@ -244,8 +244,8 @@ public:
             focusedArmors[i].box.size.height = prediction.at<float>(3);
             focusedArmors[i].vx = prediction.at<float>(4);
             focusedArmors[i].vy = prediction.at<float>(5);
-            std::cout<<"predicted pos: "<<focusedArmors[i].box.center<<std::endl;
-            std::cout<<"predicted v: "<<focusedArmors[i].vx<<","<<focusedArmors[i].vy<<std::endl;
+            // std::cout<<"predicted pos: "<<focusedArmors[i].box.center<<std::endl;
+            // std::cout<<"predicted v: "<<focusedArmors[i].vx<<","<<focusedArmors[i].vy<<std::endl;
         }
         //将检测到的装甲板与已跟踪的装甲板进行匹配
         std::vector<bool> matched(detectedArmors.size(), false);
@@ -256,9 +256,9 @@ public:
             for(size_t i = 0; i < detectedArmors.size(); i++)
             {
                 if(matched[i]) continue;
-                std::cout<<"center: "<<armor.box.center<<" " <<detectedArmors[i].box.center<<std::endl;
+                // std::cout<<"center: "<<armor.box.center<<" " <<detectedArmors[i].box.center<<std::endl;
                 float distance = cv::norm(armor.box.center - detectedArmors[i].box.center);
-                std::cout<<"distance: "<<distance<<std::endl;
+                // std::cout<<"distance: "<<distance<<std::endl;
                 if(distance < min_distance)
                 {
                     min_distance = distance;

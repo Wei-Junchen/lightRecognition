@@ -1,8 +1,8 @@
 %YAML:1.0
 ---
 hue_min: 85
-hue_max: 95
+hue_max: 110
 saturation_min: 20
-saturation_max: 120
-value_min: 150
+saturation_max: 255
+value_min: 230
 value_max: 255

@@ -26,8 +26,8 @@ int main(int argc,char** argv)
 
 #if PARAM_CONFIG_DEBUG
     //创建窗口和滑动条
-    hsvParamManager.createTrackbars("Red");
-    //hsvParamManager.createTrackbars("Blue");
+    //hsvParamManager.createTrackbars("Red");
+    hsvParamManager.createTrackbars("Blue");
 #endif
 
     std::shared_ptr<cv::Mat> frame = std::make_shared<cv::Mat>();
@@ -46,7 +46,7 @@ int main(int argc,char** argv)
         hsvParamManager.getParam(hsv_param_red, "Red");
         hsvParamManager.getParam(hsv_param_blue, "Blue");
         blue_recong->updateParam(hsv_param_blue);
-        red_recong->updateParam(hsv_param_red);
+        // red_recong->updateParam(hsv_param_red);
 #endif
         cap >> *frame;
         if(frame->empty())
