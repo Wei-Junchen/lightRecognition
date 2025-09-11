@@ -3,8 +3,10 @@
 
 #include <opencv2/opencv.hpp>
 #include <string>
+#include <map>
+#include <optional>
 
-#define PARAM_CONFIG_DEBUG false
+#define PARAM_CONFIG_DEBUG true
 #define COLOR_NUM_MAX 2
 
 struct HsvParam
@@ -16,6 +18,97 @@ struct HsvParam
         value_min,
         value_max;
 };
+
+class Setting
+{
+public:
+    Setting(const std::string& file = "../config/config.yml"): filename(file)
+    {
+        try
+        {
+            fs.open(filename, cv::FileStorage::READ);
+            if(!fs.isOpened())
+            {
+                throw std::runtime_error("Failed to open config file");
+            }
+            //load all key-value pairs into map
+            cv::FileNode root = fs.root();
+            for(auto it = root.begin(); it != root.end(); ++it)
+            {
+                std::string key = (*it).name();
+                cv::FileNode valueNode = *it;
+                if(valueNode.type() == cv::FileNode::SEQ)
+                {
+                    std::vector<std::string> values;
+                    for(auto vit = valueNode.begin(); vit != valueNode.end(); ++vit)
+                    {
+                        values.push_back((std::string)*vit);
+                    }
+                    configMap[key] = values;
+                }
+                else if(valueNode.type() == cv::FileNode::STRING || 
+                        valueNode.type() == cv::FileNode::INT || 
+                        valueNode.type() == cv::FileNode::REAL)
+                {
+                    // 处理标量值（字符串、整数、浮点数）
+                    std::vector<std::string> values;
+                    values.push_back((std::string)valueNode);
+                    configMap[key] = values;
+                }
+            }
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+            std::cerr<<"Config file "<<filename<<" not found, creating new!"<<std::endl;
+            fs.release();
+            fs.open(filename, cv::FileStorage::WRITE);
+            fs.release();
+            fs.open(filename, cv::FileStorage::READ);
+            if(!fs.isOpened())
+            {
+                std::cerr<<"Config file "<<filename<<" not found, creating new!"<<std::endl;
+                fs.release();
+                fs.open(filename, cv::FileStorage::WRITE);
+                fs.release();
+            }
+        }
+        //print all loaded key-value pairs
+        for(const auto& [key, value] : configMap)
+        {
+            std::cout << "Loaded config: " << key << " : ";
+            for(const auto& v : value)
+            {
+                std::cout << v << " ";
+            }
+            std::cout << std::endl;
+        }
+    }
+    std::optional<std::vector<std::string>> getValue(const std::string& key)
+    {
+        if(configMap.find(key) != configMap.end() && !configMap[key].empty())
+        {
+            return configMap[key];
+        }
+        return std::nullopt;
+    }
+    bool isDebug()
+    {
+        static bool debug = getValue("debug").value_or(std::vector<std::string>{"false"})[0] == "true";
+        return debug;
+    }
+    bool isTerminalOutput()  
+    {
+        static bool terminal_output = getValue("terminal_output").value_or(std::vector<std::string>{"false"})[0] == "true";
+        return terminal_output;
+    }
+private:
+    cv::FileStorage fs;
+    std::string filename;
+    std::map<std::string,std::vector<std::string>> configMap;
+};
+
+inline Setting setting;
 
 //Hsv参数管理类，可以读取和保存多个颜色的Hsv参数
 class HsvParamManager

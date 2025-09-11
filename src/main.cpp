@@ -18,7 +18,7 @@ int main(int argc,char** argv)
         std::cerr << "Error opening video file: " << argv[1] << std::endl;
         return 1;
     }
-
+    //load setting key-value pairs
     HsvParamManager hsvParamManager({"Red","Blue"});
     HsvParam hsv_param_blue, hsv_param_red;
     hsvParamManager.getParam(hsv_param_red, "Red");
@@ -26,8 +26,11 @@ int main(int argc,char** argv)
 
 #if PARAM_CONFIG_DEBUG
     //创建窗口和滑动条
-    //hsvParamManager.createTrackbars("Red");
-    hsvParamManager.createTrackbars("Blue");
+    if(setting.isDebug())
+    {
+        //hsvParamManager.createTrackbars("Red");
+        hsvParamManager.createTrackbars("Blue");
+    }
 #endif
 
     std::shared_ptr<cv::Mat> frame = std::make_shared<cv::Mat>();
@@ -43,10 +46,13 @@ int main(int argc,char** argv)
     {
 #if PARAM_CONFIG_DEBUG
         //检查是否有参数更新
-        hsvParamManager.getParam(hsv_param_red, "Red");
-        hsvParamManager.getParam(hsv_param_blue, "Blue");
-        blue_recong->updateParam(hsv_param_blue);
-        // red_recong->updateParam(hsv_param_red);
+        if(setting.isDebug())
+        {
+            hsvParamManager.getParam(hsv_param_red, "Red");
+            hsvParamManager.getParam(hsv_param_blue, "Blue");
+            blue_recong->updateParam(hsv_param_blue);
+            red_recong->updateParam(hsv_param_red);
+        }
 #endif
         cap >> *frame;
         if(frame->empty())
@@ -60,8 +66,22 @@ int main(int argc,char** argv)
         cv::Mat mask;
         Recognition::RecognitionAll();
         std::vector<Armor> armors;
-        blue_recong->getArmor(armors);
-        red_recong->getArmor(armors);
+
+        if(setting.getValue("target").has_value())
+        {
+            auto target = setting.getValue("target").value();
+            if(std::find(target.begin(), target.end(), "blue") != target.end())
+                blue_recong->getArmor(armors);
+            if(std::find(target.begin(), target.end(), "red") != target.end())
+                red_recong->getArmor(armors);
+        }
+        //默认识别所有颜色
+        else
+        {
+            blue_recong->getArmor(armors);
+            red_recong->getArmor(armors);
+        }
+
         armorFilter.updateArmor(armors);
 
         Armor::DrawArmor(*frame, armorFilter.getFocusedArmors());
@@ -74,12 +94,16 @@ int main(int argc,char** argv)
 
         cv::imshow("Frame", *frame);
 
-        if(cv::waitKey(1) == 27) //wait for 'esc' key press for 1ms. If 'esc' key is pressed, break loop
+        if(setting.getValue("playmode").has_value() && setting.getValue("playmode").value()[0] == "normal")
         {
-            std::cout << "Esc key is pressed by user. Stopping the video" << std::endl;
-            break;
+            if(cv::waitKey(1) == 27) //wait for 'esc' key press for 1ms. If 'esc' key is pressed, break loop
+            {
+                std::cout << "Esc key is pressed by user. Stopping the video" << std::endl;
+                break;
+            }
         }
-        // cv::waitKey(0);
+        else
+            cv::waitKey(0);
     }
     return 0;
 }

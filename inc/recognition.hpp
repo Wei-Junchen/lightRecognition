@@ -42,47 +42,55 @@ namespace
         else if(angle_diff2 < -90)
             angle_diff2 = -180 - angle_diff2;
 
+        bool isOutputTerminal = setting.isTerminalOutput();
         //如果考虑车子不会侧翻，那么灯条一定是不会水平的
         if(box1.angle < 10.0f || box1.angle > 170.0f || box2.angle < 10.0f || box2.angle >170.0f)
         {
-            std::cout<<"box angle too small: "<<box1.angle<<","<<box2.angle<<std::endl;
+            if(isOutputTerminal)
+                std::cout<<"box angle too small: "<<box1.angle<<","<<box2.angle<<std::endl;
             return false;
         }
 
         if(box1.size.width/box1.size.height > 7.5f || box2.size.width/box2.size.height > 7.5f)
         {
-            std::cout<<"box aspect ratio too large: "<<box1.size.width/box1.size.height<<","<<box2.size.width/box2.size.height<<std::endl;
+            if(isOutputTerminal)
+                std::cout<<"box aspect ratio too large: "<<box1.size.width/box1.size.height<<","<<box2.size.width/box2.size.height<<std::endl;
             return false;
         }
         //判断两个矩形宽高比是否相似
         if(std::abs(box1.size.width/box1.size.height - box2.size.width/box2.size.height) / std::min(box1.size.width/box1.size.height, box2.size.width/box2.size.height) > 0.7f)
         {
-            std::cout<<"box aspect ratio not similar: "<<box1.size.width/box1.size.height<<","<<box2.size.width/box2.size.height<<std::endl;
+            if(isOutputTerminal)
+                std::cout<<"box aspect ratio not similar: "<<box1.size.width/box1.size.height<<","<<box2.size.width/box2.size.height<<std::endl;
             return false;
         }
 
         //判断是否满足匹配条件
         if(center_dist > avg_width * 6.0f || center_dist < avg_width * 1.5f)
         {
-            std::cout<<"box center distance not match: "<<center_dist<<","<<avg_width * 7.0f<<","<<avg_width * 1.5f<<std::endl;
+            if(isOutputTerminal)
+                std::cout<<"box center distance not match: "<<center_dist<<","<<avg_width * 7.0f<<","<<avg_width * 1.5f<<std::endl;
             return false;
         }
         
         if(std::abs(angle_diff) > 10.0f)
         {
-            std::cout<<"box angle difference too large: "<<angle_diff<<std::endl;
+            if(isOutputTerminal)
+                std::cout<<"box angle difference too large: "<<angle_diff<<std::endl;
             return false;
         }
             
         if((std::abs(box1.size.area() - box2.size.area()) / std::min(box1.size.area(), box2.size.area())) > 3.0f)
         {
-            std::cout<<"box size area not match: "<<box1.size.area()<<","<<box2.size.area()<<std::endl;
+            if(isOutputTerminal)
+                std::cout<<"box size area not match: "<<box1.size.area()<<","<<box2.size.area()<<std::endl;
             return false;
         }
 
         if(std::abs(angle_diff1) < 75.0f || std::abs(angle_diff2) < 75.0f)
         {
-            std::cout<<"box angle difference to center line too large: "<<angle_diff1<<","<<angle_diff2<<std::endl;
+            if(isOutputTerminal)
+                std::cout<<"box angle difference to center line too large: "<<angle_diff1<<","<<angle_diff2<<std::endl;
             return false;
         }
         
@@ -148,7 +156,8 @@ public:
                         out_img);
         }
 #if PARAM_CONFIG_DEBUG
-        cv::imshow("After inRange", out_img);
+        if(setting.isDebug())
+            cv::imshow("After inRange", out_img);
 #endif
         //图像进行中值滤波
         cv::medianBlur(out_img, out_img, 7);
@@ -157,12 +166,14 @@ public:
         cv::Mat morph_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
         cv::morphologyEx(out_img, out_img, cv::MORPH_CLOSE, morph_kernel);
 #if PARAM_CONFIG_DEBUG
-        cv::imshow("After morphologyEx", out_img);
+        if(setting.isDebug())
+            cv::imshow("After morphologyEx", out_img);
 #endif
         //边缘检测
         cv::Canny(out_img, out_img, 50, 150);
 #if PARAM_CONFIG_DEBUG
-        cv::imshow("After Canny", out_img);
+        if(setting.isDebug())
+            cv::imshow("After Canny", out_img);
 #endif
         std::vector<std::vector<cv::Point>> contours;
         //找出所有轮廓
