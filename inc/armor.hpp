@@ -3,6 +3,7 @@
 
 #include <opencv2/opencv.hpp>
 #include "cnn.hpp"
+#include "motion.hpp"
 
 cv::Mat K = (cv::Mat_<double>(3,3) << 
                  1.7774091341308808e+03, 0., 7.1075979428865026e+02, 
@@ -160,9 +161,33 @@ public:
                                                             (lights[1].vertices[0] + lights[1].vertices[1])/2.0,lights[1].center,(lights[1].vertices[3]+lights[1].vertices[2])/2.0},
                       K, dicoef, rvec, tvec);
         center_distance = cv::norm(tvec);
-        // std::cout<<"tvec: "<<tvec<<std::endl;
-        // std::cout<<"center_distance:" << center_distance << std::endl;
-    }
+        //转换到世界坐标系
+        cv::Mat R_yaw = (cv::Mat_<double>(3,3)<<
+            cos(Motion::yaw * CV_PI / 180.0),0,-sin(Motion::yaw * CV_PI / 180.0),
+            0,1,0,
+            sin(Motion::yaw * CV_PI / 180.0),0,cos(Motion::yaw * CV_PI / 180.0));  
+        cv::Mat R_pitch = (cv::Mat_<double>(3,3)<<
+            1,0,0,
+            0,cos(Motion::pitch * CV_PI / 180.0),sin(Motion::pitch * CV_PI / 180.0),
+            0,-sin(Motion::pitch * CV_PI / 180.0),cos(Motion::pitch * CV_PI / 180.0));
+        cv::Mat R_roll = (cv::Mat_<double>(3,3)<<
+            cos(Motion::roll * CV_PI / 180.0),sin(Motion::roll * CV_PI / 180.0),0,
+            -sin(Motion::roll * CV_PI / 180.0),cos(Motion::roll * CV_PI / 180.0),0,
+            0,0,1);
+        cv::Mat R = R_yaw * R_pitch * R_roll;
+        tvec_world = cv::Mat(R * tvec);
+        //把rvec转换为旋转矩阵
+        cv::Mat rmat_cam;
+        cv::Rodrigues(rvec, rmat_cam);     // rvec → rmat_cam (3x3)
+        rmat_world = R * rmat_cam; // 世界系旋转矩阵 (3x3)
+        std::cout<<"rmat_world: "<<rmat_world<<std::endl;
+        //计算世界系下的rvec的x分量的指向
+        cv::Mat tmp;
+        rmat_world.col(0).copyTo(tmp); // 世界系rvec (3x1)
+        angle_world = std::atan2(tmp.at<double>(2,0), tmp.at<double>(0,0)) * 180.0 / CV_PI;
+        std::cout<<"angle_world: "<<angle_world<<std::endl;
+        std::cout<<"tvec_world: "<<tvec_world.t()<<std::endl;
+    } 
     //获取装甲板ID，使用CNN识别，用DNN导入模型
     int getId()
     {
@@ -188,12 +213,16 @@ private:
     float center_distance;
     inline static size_t totalArmor = 0; //总识别到的装甲板数
     float vx, vy; //速度
+
+    cv::Mat tvec_world; //世界坐标系下的tvec
+    cv::Mat rmat_world; //世界坐标系下的旋转矩阵
+    double angle_world; //世界坐标系下的rvec的x分量的指向
 };
 
 
 float dt = 0.05; //时间间隔
 
-//定义armor的状态空间(cx,cy,h,w,vx,vy)
+//定义armor的状态空间((cx,cy,h,w,vx,vy))
 cv::Mat state = (cv::Mat_<float>(6,1) << 0,0,0,0,0,0);
 
 //定义状态转移矩阵

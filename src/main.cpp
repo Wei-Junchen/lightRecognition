@@ -28,17 +28,29 @@ int main(int argc,char** argv)
     //创建窗口和滑动条
     if(setting.isDebug())
     {
-        //hsvParamManager.createTrackbars("Red");
-        hsvParamManager.createTrackbars("Blue");
+        if(setting.getValue("target").has_value())
+        {
+            auto target = setting.getValue("target").value();
+            if(std::find(target.begin(), target.end(), "blue") != target.end())
+                hsvParamManager.createTrackbars("Blue");
+            if(std::find(target.begin(), target.end(), "red") != target.end())
+                hsvParamManager.createTrackbars("Red");
+        }
     }
 #endif
 
     std::shared_ptr<cv::Mat> frame = std::make_shared<cv::Mat>();
     Armor::setFrame(frame);
     ArmorFilter armorFilter;
-    auto blue_recong = Recognition::createRecognition(hsv_param_blue, frame, 0);
-    auto red_recong = Recognition::createRecognition(hsv_param_red, frame, 1);
-
+    std::shared_ptr<Recognition> blue_recong, red_recong;
+    if(setting.getValue("target").has_value())
+    {
+        auto target = setting.getValue("target").value();
+        if(std::find(target.begin(), target.end(), "blue") != target.end())
+            blue_recong = Recognition::createRecognition(hsv_param_blue, frame, 0);
+        if(std::find(target.begin(), target.end(), "red") != target.end())
+            red_recong = Recognition::createRecognition(hsv_param_red, frame, 1);
+    }
     auto startTime = std::chrono::high_resolution_clock::now();
     double fps = cap.get(cv::CAP_PROP_FPS);
 
@@ -48,10 +60,20 @@ int main(int argc,char** argv)
         //检查是否有参数更新
         if(setting.isDebug())
         {
-            hsvParamManager.getParam(hsv_param_red, "Red");
-            hsvParamManager.getParam(hsv_param_blue, "Blue");
-            blue_recong->updateParam(hsv_param_blue);
-            red_recong->updateParam(hsv_param_red);
+            if(setting.getValue("target").has_value())
+            {
+                auto target = setting.getValue("target").value();
+                if(std::find(target.begin(), target.end(), "blue") != target.end())
+                {
+                    hsvParamManager.getParam(hsv_param_blue, "Blue");
+                    blue_recong->updateParam(hsv_param_blue);
+                }
+                if(std::find(target.begin(), target.end(), "red") != target.end())
+                {
+                    hsvParamManager.getParam(hsv_param_red, "Red");
+                    red_recong->updateParam(hsv_param_red);
+                }
+            }
         }
 #endif
         cap >> *frame;

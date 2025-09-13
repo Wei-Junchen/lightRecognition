@@ -1,8 +1,8 @@
 %YAML:1.0
 ---
 target: 
-  - blue 
-  - red
+  - blue
 debug: false
-terminal_output: false 
-playmode: normal # normal or step
+terminal_output: false
+# normal or step
+playmode: normal

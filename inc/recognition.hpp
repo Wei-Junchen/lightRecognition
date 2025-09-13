@@ -51,22 +51,22 @@ namespace
             return false;
         }
 
-        if(box1.size.width/box1.size.height > 7.5f || box2.size.width/box2.size.height > 7.5f)
+        // if(box1.size.width/box1.size.height > 7.5f || box2.size.width/box2.size.height > 7.5f)
+        // {
+        //     if(isOutputTerminal)
+        //         std::cout<<"box aspect ratio too large: "<<box1.size.width/box1.size.height<<","<<box2.size.width/box2.size.height<<std::endl;
+        //     return false;
+        // }
+        //判断两个矩形宽是否相似
+        if(std::abs(box1.size.width - box2.size.width) / std::min(box1.size.width, box2.size.width) > 0.7f)
         {
             if(isOutputTerminal)
-                std::cout<<"box aspect ratio too large: "<<box1.size.width/box1.size.height<<","<<box2.size.width/box2.size.height<<std::endl;
-            return false;
-        }
-        //判断两个矩形宽高比是否相似
-        if(std::abs(box1.size.width/box1.size.height - box2.size.width/box2.size.height) / std::min(box1.size.width/box1.size.height, box2.size.width/box2.size.height) > 0.7f)
-        {
-            if(isOutputTerminal)
-                std::cout<<"box aspect ratio not similar: "<<box1.size.width/box1.size.height<<","<<box2.size.width/box2.size.height<<std::endl;
+                std::cout<<"box width not similar: "<<box1.size.width<<","<<box2.size.width<<std::endl;
             return false;
         }
 
         //判断是否满足匹配条件
-        if(center_dist > avg_width * 6.0f || center_dist < avg_width * 1.5f)
+        if(center_dist > avg_width * 6.0f || center_dist < avg_width * 0.75f)
         {
             if(isOutputTerminal)
                 std::cout<<"box center distance not match: "<<center_dist<<","<<avg_width * 7.0f<<","<<avg_width * 1.5f<<std::endl;
@@ -80,12 +80,12 @@ namespace
             return false;
         }
             
-        if((std::abs(box1.size.area() - box2.size.area()) / std::min(box1.size.area(), box2.size.area())) > 3.0f)
-        {
-            if(isOutputTerminal)
-                std::cout<<"box size area not match: "<<box1.size.area()<<","<<box2.size.area()<<std::endl;
-            return false;
-        }
+        // if((std::abs(box1.size.area() - box2.size.area()) / std::min(box1.size.area(), box2.size.area())) > 3.0f)
+        // {
+        //     if(isOutputTerminal)
+        //         std::cout<<"box size area not match: "<<box1.size.area()<<","<<box2.size.area()<<std::endl;
+        //     return false;
+        // }
 
         if(std::abs(angle_diff1) < 75.0f || std::abs(angle_diff2) < 75.0f)
         {
@@ -169,16 +169,15 @@ public:
         if(setting.isDebug())
             cv::imshow("After morphologyEx", out_img);
 #endif
-        //边缘检测
-        cv::Canny(out_img, out_img, 50, 150);
-#if PARAM_CONFIG_DEBUG
-        if(setting.isDebug())
-            cv::imshow("After Canny", out_img);
-#endif
         std::vector<std::vector<cv::Point>> contours;
         //找出所有轮廓
         cv::findContours(out_img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-        
+        // //绘画出所有轮廓
+        // cv::cvtColor(out_img, out_img, cv::COLOR_GRAY2BGR);
+        // cv::drawContours(out_img, contours, -1, cv::Scalar(0, 255, 0), 2);
+        // cv::imshow("All Contours", out_img);
+
+
         std::vector<MyRotatedRect> boxes;
         std::vector<bool> used(contours.size(), false);
 
