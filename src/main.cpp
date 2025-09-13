@@ -4,6 +4,7 @@
 #include <chrono>
 #include "recognition.hpp"
 #include "paramConfig.hpp"
+#include "videoLoader.hpp"
 
 int main(int argc,char** argv)
 {
@@ -12,8 +13,8 @@ int main(int argc,char** argv)
         std::cerr << "Usage: " << argv[0] << " <video_path>" << std::endl;
         return 1;
     }
-    cv::VideoCapture cap(argv[1]);
-    if(!cap.isOpened())
+    VideoLoader::VideoInput videoInput(VideoLoader::InputType::VIDEO, argv[1]);
+    if(!videoInput.isOpened())
     {
         std::cerr << "Error opening video file: " << argv[1] << std::endl;
         return 1;
@@ -52,7 +53,7 @@ int main(int argc,char** argv)
             red_recong = Recognition::createRecognition(hsv_param_red, frame, 1);
     }
     auto startTime = std::chrono::high_resolution_clock::now();
-    double fps = cap.get(cv::CAP_PROP_FPS);
+    double fps = videoInput.get(cv::CAP_PROP_FPS);
 
     while(true)
     {
@@ -76,9 +77,11 @@ int main(int argc,char** argv)
             }
         }
 #endif
-        cap >> *frame;
-        if(frame->empty())
+        videoInput.getFrame(*frame);
+        if(videoInput.isEnd())
             break;
+        if(frame->empty())
+            continue;
 
         auto currentTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = currentTime - startTime;
@@ -118,10 +121,15 @@ int main(int argc,char** argv)
 
         if(setting.getValue("playmode").has_value() && setting.getValue("playmode").value()[0] == "normal")
         {
-            if(cv::waitKey(1) == 27) //wait for 'esc' key press for 1ms. If 'esc' key is pressed, break loop
+            uchar key = (uchar)cv::waitKey(1);
+            if(key == 27) //wait for 'esc' key press for 1ms. If 'esc' key is pressed, break loop
             {
                 std::cout << "Esc key is pressed by user. Stopping the video" << std::endl;
                 break;
+            }
+            else if(key == 'p') //wait for 'p' key press for pause
+            {
+                cv::waitKey(0);
             }
         }
         else

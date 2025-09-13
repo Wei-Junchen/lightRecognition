@@ -180,13 +180,10 @@ public:
         cv::Mat rmat_cam;
         cv::Rodrigues(rvec, rmat_cam);     // rvec → rmat_cam (3x3)
         rmat_world = R * rmat_cam; // 世界系旋转矩阵 (3x3)
-        std::cout<<"rmat_world: "<<rmat_world<<std::endl;
         //计算世界系下的rvec的x分量的指向
         cv::Mat tmp;
         rmat_world.col(0).copyTo(tmp); // 世界系rvec (3x1)
         angle_world = std::atan2(tmp.at<double>(2,0), tmp.at<double>(0,0)) * 180.0 / CV_PI;
-        std::cout<<"angle_world: "<<angle_world<<std::endl;
-        std::cout<<"tvec_world: "<<tvec_world.t()<<std::endl;
     } 
     //获取装甲板ID，使用CNN识别，用DNN导入模型
     int getId()
