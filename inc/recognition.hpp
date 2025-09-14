@@ -43,6 +43,8 @@ namespace
             angle_diff2 = -180 - angle_diff2;
 
         bool isOutputTerminal = setting.isTerminalOutput();
+        if(isOutputTerminal)
+            std::cout<<"box1: "<<box1.id<<" box2: "<<box2.id<<" :\n";
         //如果考虑车子不会侧翻，那么灯条一定是不会水平的
         if(box1.angle < 10.0f || box1.angle > 170.0f || box2.angle < 10.0f || box2.angle >170.0f)
         {
@@ -66,7 +68,7 @@ namespace
         }
 
         //判断是否满足匹配条件
-        if(center_dist > avg_width * 6.0f || center_dist < avg_width * 0.75f)
+        if(center_dist > avg_width * 8.0f || center_dist < avg_width * 0.75f)
         {
             if(isOutputTerminal)
                 std::cout<<"box center distance not match: "<<center_dist<<","<<avg_width * 7.0f<<","<<avg_width * 1.5f<<std::endl;
@@ -173,14 +175,10 @@ public:
         //找出所有轮廓
         cv::findContours(out_img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
         // //绘画出所有轮廓
-        // cv::cvtColor(out_img, out_img, cv::COLOR_GRAY2BGR);
-        // cv::drawContours(out_img, contours, -1, cv::Scalar(0, 255, 0), 2);
-        // cv::imshow("All Contours", out_img);
-
 
         std::vector<MyRotatedRect> boxes;
         std::vector<bool> used(contours.size(), false);
-
+        int id_counter = 0;
         for(const auto& contour : contours)
         {
             //使用最小外接平行四边形
@@ -204,18 +202,19 @@ public:
             mybox.size = dist > dist1 ? cv::Size2f(dist, dist1) : cv::Size2f(dist1, dist);
             mybox.center = box.center;
             mybox.angle = angle;
+            mybox.id = id_counter++;
             boxes.push_back(mybox);
 
-            // //画出每个灯条
+            //画出每个灯条
             // for(int i = 0; i < 4; i++)
             // {
             //     cv::line(*src_img, mybox.vertices[i], mybox.vertices[(i+1)%4], cv::Scalar(0, 255, 255), 2);
             // }
-            // //在灯条上显示角度和长短边像素
+            // cv::putText(*src_img,std::to_string(mybox.id),box.center, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 255), 1);
+            //在灯条上显示角度和长短边像素
             // cv::putText(*src_img,
             //             "Angle: " + std::to_string(float(mybox.angle)) + ", H: " + std::to_string(float(mybox.size.height)) + ", W: " + std::to_string(float(mybox.size.width)),
             //             box.center, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 255), 1);
-            
                 
         }
 

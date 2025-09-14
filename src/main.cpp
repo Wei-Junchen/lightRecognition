@@ -5,6 +5,8 @@
 #include "recognition.hpp"
 #include "paramConfig.hpp"
 #include "videoLoader.hpp"
+#include "filter.hpp"
+#include "tracker.hpp"
 
 int main(int argc,char** argv)
 {
@@ -42,7 +44,6 @@ int main(int argc,char** argv)
 
     std::shared_ptr<cv::Mat> frame = std::make_shared<cv::Mat>();
     Armor::setFrame(frame);
-    ArmorFilter armorFilter;
     std::shared_ptr<Recognition> blue_recong, red_recong;
     if(setting.getValue("target").has_value())
     {
@@ -106,10 +107,10 @@ int main(int argc,char** argv)
             blue_recong->getArmor(armors);
             red_recong->getArmor(armors);
         }
-
-        armorFilter.updateArmor(armors);
-
-        Armor::DrawArmor(*frame, armorFilter.getFocusedArmors());
+        
+        ArmorTracker::TrackedArmor::HungarianMatch(armors);
+        ArmorTracker::getTrackedArmors(armors);
+        Armor::DrawArmor(*frame, armors);
 
         if (elapsed.count() > 0)
         {
