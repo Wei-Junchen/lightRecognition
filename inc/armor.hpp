@@ -216,7 +216,7 @@ private:
     cv::Mat tvec;   //平移向量
     float center_distance;
     inline static size_t totalArmor = 0; //总识别到的装甲板数
-    float vx, vy, vz; //速度
+    float vx = 0.0f, vy = 0.0f, vz = 0.0f; //速度
 
     cv::Mat tvec_world; //世界坐标系下的tvec
     cv::Mat rmat_world; //世界坐标系下的旋转矩阵

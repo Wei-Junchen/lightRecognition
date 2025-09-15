@@ -7,7 +7,7 @@ namespace
 {
     float bulletSpeed = 0.25f * 1000.0f; //mm/s
     float gravity = 9.81f * 1000.0f; //mm/s^2
-};
+}
 
 namespace Trajectory
 {
@@ -37,6 +37,6 @@ namespace Trajectory
         float time = distance / (bulletSpeed * std::cos(pitch * CV_PI / 180.0f));
         return cv::Vec3f(yaw, pitch, time);
     }
-};
+}
 
 #endif
