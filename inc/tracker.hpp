@@ -7,6 +7,8 @@
 
 #define FILTER_TYPE 1 //1 for 3D filter, 2 for 2D filter
 
+namespace Shooter { class CapableTrajectory; }
+
 namespace
 {
     //tvec_world三维位置+三维速度卡尔曼滤波器
@@ -20,7 +22,7 @@ namespace
     //                                                 0,0,0,100,0,0,
     //                                                 0,0,0,0,100,0,
     //                                                 0,0,0,0,0,1000));//速度初始方差设置大一点，因为只能观测位置
-    KalmanFilter initFilter(STATE_DIM, MEASURE_DIM, ArmorFilter::transitionMatrix, ArmorFilter::measurementMatrix, cv::Mat(), ArmorFilter::makeProcessNoiseCov6(ArmorFilter::dt,1000.0f), ArmorFilter::measurementNoiseCov,
+    KalmanFilter initFilter(STATE_DIM, MEASURE_DIM, ArmorFilter::transitionMatrix, ArmorFilter::measurementMatrix, cv::Mat(), ArmorFilter::makeProcessNoiseCov6(ArmorFilter::dt,5000.0f), ArmorFilter::measurementNoiseCov,
                         (cv::Mat_<float>(6,6) <<    1,0,0,0,0,0,
                                                     0,1,0,0,0,0,
                                                     0,0,1,0,0,0,
@@ -44,8 +46,10 @@ namespace ArmorTracker
 {
     class TrackedArmor
     {
+        friend class Shooter::CapableTrajectory;
     public:
         static void HungarianMatch(std::vector<Armor>& detectedArmors);
+        static void predictTrackedArmors(float dt);
 #if FILTER_TYPE == 1
         TrackedArmor(const Armor& armor, KalmanFilter kf = initFilter) : armor_(armor), kf_(kf), lostCount_(0)
         {
@@ -90,7 +94,7 @@ namespace ArmorTracker
                                    detectedArmor.tvec_world.at<double>(1),
                                    detectedArmor.tvec_world.at<double>(2));
             cv::Mat estimated = kf_.PredictAndUpdate(measurement);
-            std::cout<<"estimated state: " << estimated.t() << std::endl;
+            // std::cout<<"estimated state: " << estimated.t() << std::endl;
             armor_ = detectedArmor;
             armor_.tvec_world.at<double>(0) = estimated.at<float>(0);
             armor_.tvec_world.at<double>(1) = estimated.at<float>(1);
@@ -111,6 +115,14 @@ namespace ArmorTracker
         }
         int getLostCount() const { return lostCount_; }
         const Armor& getArmor() const { return armor_; }
+
+        void predictArmors(float dt)
+        {
+            //更新所有跟踪装甲板的预测位置
+                armor_.predict_position = cv::Point3f(armor_.tvec_world.at<double>(0) + armor_.vx * dt,
+                                                        armor_.tvec_world.at<double>(1) + armor_.vy * dt,
+                                                        armor_.tvec_world.at<double>(2) + armor_.vz * dt);
+        }
     private:
         KalmanFilter kf_;
         int lostCount_; //丢失计数器
@@ -130,7 +142,7 @@ namespace ArmorTracker
         {
             tracked.lostCount_++;
             cv::Mat prediction = tracked.PredictWithoutUpdate();
-            float min_distance = 1000.0f;
+            float min_distance = 300.0f;
             int min_index = -1;
             // std::cout<<"Predicted state: " << prediction.t() << std::endl;
             for(size_t i = 0; i < detectedArmors.size(); i++)
@@ -182,6 +194,18 @@ namespace ArmorTracker
         for(const auto& ta : trackedArmors)
         {
             output.push_back(ta.getArmor());
+        }
+    }
+
+    void TrackedArmor::predictTrackedArmors(float dt)
+    {
+        //更新所有跟踪装甲板的预测位置
+        for(auto& tracked : trackedArmors)
+        {
+            tracked.armor_.predict_position = cv::Point3f(tracked.armor_.tvec_world.at<double>(0) + tracked.armor_.vx * dt,
+                                                    tracked.armor_.tvec_world.at<double>(1) + tracked.armor_.vy * dt,
+                                                    tracked.armor_.tvec_world.at<double>(2) + tracked.armor_.vz * dt);
+            // std::cout<<"Predicted position: " << tracked.armor_.predict_position << std::endl;
         }
     }
 }

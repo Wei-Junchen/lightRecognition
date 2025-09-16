@@ -3,27 +3,10 @@
 
 #include <opencv2/opencv.hpp>
 #include "cnn.hpp"
-#include "motion.hpp"
+#include "transformation.hpp"
 
 namespace ArmorTracker { class TrackedArmor; }
-
-cv::Mat K = (cv::Mat_<double>(3,3) << 
-                 1.7774091341308808e+03, 0., 7.1075979428865026e+02, 
-                 0.,1.7754170626354828e+03, 5.3472407285624729e+02, 
-                 0., 0., 1.);
-
-cv::Mat dicoef = (cv::Mat_<double>(1,5) << 
-                 -5.6313426428564950e-01, 1.8301501710641366e-01, 
-                 1.9661478907901904e-03, 9.6259122849674621e-04,
-                 5.6883803390679100e-01);
-
-cv::Mat objectPoints = (cv::Mat_<double>(6,3) << 
-                 -65.0, 55.0, 0.,   //左上
-                 -65.0, 0.0, 0.,    //左中
-                 -65.0, -55.0, 0.,  //左下
-                  65.0, 55.0, 0.,   //右上
-                  65.0, 0., 0.,     //右中   
-                  65.0, -55.0, 0.); //右下
+namespace Shooter { class CapableTrajectory; }
 
 struct MyRotatedRect
 {
@@ -57,11 +40,12 @@ namespace
         for(int i=0;i<4;++i)
             vertices[i] = tmp[i];
     }
-};
+}
 
 class Armor
 {
     friend class ArmorTracker::TrackedArmor;
+    friend class Shooter::CapableTrajectory;
 public:
     static void DrawArmor(cv::Mat& img,const std::vector<Armor>& armors)
     {
@@ -94,7 +78,11 @@ public:
             //标出装甲板ID
             cv::putText(img, std::to_string(armor.id), armor.box.vertices[3],
                         cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 255), 2);
+
+            // std::cout<<armor.predict_position<<std::endl;
+            Transformation::projectWorldPointToImage(armor.predict_position,img);
         }
+        
     }
     Armor() = default;
     Armor(MyRotatedRect light1, MyRotatedRect light2, int type): type(type)
@@ -159,34 +147,22 @@ public:
         //通过乘上系数使得平均亮度达到100
         double alpha = 100.0 / mean_brightness;
         box_image.convertTo(box_image, -1, alpha, 0);
+
         //保存图片到本地，测试用
         //cv::imwrite("../armorImage/" + std::to_string(totalArmor++) + ".jpg", box_image);
+
         id = getId();
+
         // cv::namedWindow("box_image" + std::to_string(id), cv::WINDOW_NORMAL);
         // cv::imshow("box_image" + std::to_string(id), box_image);
-        cv::solvePnP(objectPoints, std::vector<cv::Point2f>{(lights[0].vertices[0] + lights[0].vertices[1])/2.0,lights[0].center,(lights[0].vertices[3]+lights[0].vertices[2])/2.0,
+
+        Transformation::solvePnP(std::vector<cv::Point2f>{(lights[0].vertices[0] + lights[0].vertices[1])/2.0,lights[0].center,(lights[0].vertices[3]+lights[0].vertices[2])/2.0,
                                                             (lights[1].vertices[0] + lights[1].vertices[1])/2.0,lights[1].center,(lights[1].vertices[3]+lights[1].vertices[2])/2.0},
-                      K, dicoef, rvec, tvec);
+                                 rvec, tvec);
+        //计算装甲板距离
         center_distance = cv::norm(tvec);
         //转换到世界坐标系
-        cv::Mat R_yaw = (cv::Mat_<double>(3,3)<<
-            cos(Motion::yaw * CV_PI / 180.0),0,-sin(Motion::yaw * CV_PI / 180.0),
-            0,1,0,
-            sin(Motion::yaw * CV_PI / 180.0),0,cos(Motion::yaw * CV_PI / 180.0));  
-        cv::Mat R_pitch = (cv::Mat_<double>(3,3)<<
-            1,0,0,
-            0,cos(Motion::pitch * CV_PI / 180.0),sin(Motion::pitch * CV_PI / 180.0),
-            0,-sin(Motion::pitch * CV_PI / 180.0),cos(Motion::pitch * CV_PI / 180.0));
-        cv::Mat R_roll = (cv::Mat_<double>(3,3)<<
-            cos(Motion::roll * CV_PI / 180.0),sin(Motion::roll * CV_PI / 180.0),0,
-            -sin(Motion::roll * CV_PI / 180.0),cos(Motion::roll * CV_PI / 180.0),0,
-            0,0,1);
-        cv::Mat R = R_yaw * R_pitch * R_roll;
-        tvec_world = cv::Mat(R * tvec);
-        //把rvec转换为旋转矩阵
-        cv::Mat rmat_cam;
-        cv::Rodrigues(rvec, rmat_cam);     // rvec → rmat_cam (3x3)
-        rmat_world = R * rmat_cam; // 世界系旋转矩阵 (3x3)
+        Transformation::transformToWorldCoord(rvec, tvec, tvec_world, rmat_world);
         //计算世界系下的rvec的x分量的指向
         cv::Mat tmp;
         rmat_world.col(0).copyTo(tmp); // 世界系rvec (3x1)
@@ -217,7 +193,7 @@ private:
     float center_distance;
     inline static size_t totalArmor = 0; //总识别到的装甲板数
     float vx = 0.0f, vy = 0.0f, vz = 0.0f; //速度
-
+    cv::Point3f predict_position; //预测位置
     cv::Mat tvec_world; //世界坐标系下的tvec
     cv::Mat rmat_world; //世界坐标系下的旋转矩阵
     double angle_world; //世界坐标系下的rvec的x分量的指向

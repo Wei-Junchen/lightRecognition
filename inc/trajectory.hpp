@@ -5,9 +5,10 @@
 
 namespace
 {
-    float bulletSpeed = 0.25f * 1000.0f; //mm/s
+    float bulletSpeed = 25.0f * 1000.0f; //mm/s
     float gravity = 9.81f * 1000.0f; //mm/s^2
 }
+
 
 namespace Trajectory
 {
@@ -17,25 +18,20 @@ namespace Trajectory
         //考虑PnP解算系x轴向右，y轴向下，z轴向里
         float yaw = -std::atan2(target_position.x, target_position.z) * 180.0f / CV_PI; //x < 0 ,z > 0时，yaw > 0
         float distance = std::sqrt(target_position.x * target_position.x + target_position.z * target_position.z);
-        //解一元二次方程求pitch
-        float a = -0.5f * gravity * distance * distance / (bulletSpeed * bulletSpeed);
-        float b = distance;
-        float c = target_position.y;
-
-        float discriminant = b * b - 4 * a * c;
-        if (discriminant < 0)
+        
+        float pitch1 = atan2(gravity * distance, bulletSpeed * bulletSpeed * 2.0f) * 180.0f / CV_PI; //抛物线最高点在目标前方时，pitch > 0
+        float pitch2 = 90.0f - pitch1; //抛物线最高点在目标后方时，pitch < 0
+        // std::cout<<"pitch1: "<<pitch1<<", pitch2: "<<pitch2<<std::endl;
+        float t1 = distance / (bulletSpeed * std::cos(pitch1 * CV_PI / 180.0f));
+        float t2 = distance / (bulletSpeed * std::cos(pitch2 * CV_PI / 180.0f));
+        if(t1 < t2)
         {
-            //无解
-            return cv::Vec3f(0, 0, 0);
+            return cv::Vec3f(yaw, pitch1, t1);
         }
-
-        //如果有两个解，选择pitch较小的那个
-        float sqrt_discriminant = std::sqrt(discriminant);
-        float pitch1 = std::atan2((-b + sqrt_discriminant), (2 * a)) * 180.0f / CV_PI;
-        float pitch2 = std::atan2((-b - sqrt_discriminant), (2 * a)) * 180.0f / CV_PI;
-        float pitch = std::min(pitch1, pitch2); //选择较小的角度
-        float time = distance / (bulletSpeed * std::cos(pitch * CV_PI / 180.0f));
-        return cv::Vec3f(yaw, pitch, time);
+        else
+        {
+            return cv::Vec3f(yaw, pitch2, t2);
+        }
     }
 }
 

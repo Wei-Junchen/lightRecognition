@@ -7,6 +7,7 @@
 #include "videoLoader.hpp"
 #include "filter.hpp"
 #include "tracker.hpp"
+#include "shooter.hpp"
 
 int main(int argc,char** argv)
 {
@@ -109,7 +110,14 @@ int main(int argc,char** argv)
         }
         
         ArmorTracker::TrackedArmor::HungarianMatch(armors);
+        //predict位置更新，dt=0.5s
+        Shooter::CapableTrajectory::computeTrajectory();
+        for(auto & traj : Shooter::CapableTrajectory::trajectories)
+        {
+            ArmorTracker::trackedArmors[traj.getTrackedIndex()].predictArmors(traj.getDt());
+        }
         ArmorTracker::getTrackedArmors(armors);
+        
         Armor::DrawArmor(*frame, armors);
 
         if (elapsed.count() > 0)
