@@ -51,8 +51,8 @@ public:
     {
         for(const auto& armor : armors)
         {
-            // if(armor.is_detected == false)
-            //     continue;
+            if(armor.id_car == -1)
+                continue;
             //画出两个灯条
             for(int i = 0; i < 4; i++)
                 cv::line(img, armor.lights[0].vertices[i], armor.lights[0].vertices[(i+1)%4], cv::Scalar(0, 255, 0), 2);
@@ -78,6 +78,9 @@ public:
             //标出装甲板ID
             cv::putText(img, std::to_string(armor.id), armor.box.vertices[3],
                         cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 255), 2);
+
+            cv::putText(img, std::to_string(armor.id_car), armor.box.vertices[2],
+                        cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
 
             // std::cout<<armor.predict_position<<std::endl;
             Transformation::projectWorldPointToImage(armor.predict_position,img);
@@ -151,7 +154,7 @@ public:
         //保存图片到本地，测试用
         //cv::imwrite("../armorImage/" + std::to_string(totalArmor++) + ".jpg", box_image);
 
-        id = getId();
+        id = CNN::predict(box_image);
 
         // cv::namedWindow("box_image" + std::to_string(id), cv::WINDOW_NORMAL);
         // cv::imshow("box_image" + std::to_string(id), box_image);
@@ -169,9 +172,9 @@ public:
         angle_world = std::atan2(tmp.at<double>(2,0), tmp.at<double>(0,0)) * 180.0 / CV_PI;
     } 
     //获取装甲板ID，使用CNN识别，用DNN导入模型
-    int getId()
+    int getId() const
     {
-        return CNN::predict(box_image);
+        return id;
     }
     ~Armor() = default;
     
@@ -180,6 +183,7 @@ public:
         Armor::frame = f;
     }
 
+    int id_car = -1;
 private:
     bool is_detected;
     int type; // 0 for blue, 1 for red

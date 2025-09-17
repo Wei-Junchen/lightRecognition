@@ -45,7 +45,6 @@ namespace Shooter
             {
                 ArmorTracker::TrackedArmor::predictTrackedArmors(step);
                 cv::Point3f target_pos = tracked.armor_.predict_position;
-                // std::cout<<"target_pos: "<<target_pos<<std::endl;
                 cv::Vec3f root = Trajectory::calculateTvec(target_pos);
                 //无解
                 if(root == cv::Vec3f(0,0,0))

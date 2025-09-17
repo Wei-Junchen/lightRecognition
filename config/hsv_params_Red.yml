@@ -4,5 +4,5 @@ hue_min: 170
 hue_max: 40
 saturation_min: 20
 saturation_max: 255
-value_min: 200
+value_min: 220
 value_max: 255

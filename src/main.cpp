@@ -8,6 +8,7 @@
 #include "filter.hpp"
 #include "tracker.hpp"
 #include "shooter.hpp"
+#include "car.hpp"
 
 int main(int argc,char** argv)
 {
@@ -56,7 +57,7 @@ int main(int argc,char** argv)
     }
     auto startTime = std::chrono::high_resolution_clock::now();
     double fps = videoInput.get(cv::CAP_PROP_FPS);
-
+    std::cout<<"Video FPS: "<<fps<<std::endl;
     while(true)
     {
 #if PARAM_CONFIG_DEBUG
@@ -116,6 +117,8 @@ int main(int argc,char** argv)
         {
             ArmorTracker::trackedArmors[traj.getTrackedIndex()].predictArmors(traj.getDt());
         }
+
+        Car::updateFromTrackedArmors(ArmorTracker::trackedArmors);
         ArmorTracker::getTrackedArmors(armors);
         
         Armor::DrawArmor(*frame, armors);
@@ -130,7 +133,7 @@ int main(int argc,char** argv)
 
         if(setting.getValue("playmode").has_value() && setting.getValue("playmode").value()[0] == "normal")
         {
-            uchar key = (uchar)cv::waitKey(1);
+            uchar key = (uchar)cv::waitKey((int)(1000.0/fps) - 6); //wait for 'esc' key press for 1ms. If 'esc' key is pressed, break loop
             if(key == 27) //wait for 'esc' key press for 1ms. If 'esc' key is pressed, break loop
             {
                 std::cout << "Esc key is pressed by user. Stopping the video" << std::endl;

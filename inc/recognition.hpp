@@ -68,7 +68,7 @@ namespace
         }
 
         //判断是否满足匹配条件
-        if(center_dist > avg_width * 8.0f || center_dist < avg_width * 0.75f)
+        if(center_dist > avg_width * 5.0f || center_dist < avg_width * 1.25f)
         {
             if(isOutputTerminal)
                 std::cout<<"box center distance not match: "<<center_dist<<","<<avg_width * 7.0f<<","<<avg_width * 1.5f<<std::endl;
@@ -162,14 +162,29 @@ public:
             cv::imshow("After inRange", out_img);
 #endif
         //图像进行中值滤波
-        cv::medianBlur(out_img, out_img, 7);
+        cv::medianBlur(out_img, out_img, 3);
 
+        // cv::imshow("After medianBlur", out_img);
+        //连通域分析
+        cv::Mat labels, stats, centroids;
+        int num_labels = cv::connectedComponentsWithStats(out_img, labels, stats, centroids);
+
+        //删除小连通域
+        for(int i = 1; i < num_labels; i++) //从1开始，跳过背景
+        {
+            int area = stats.at<int>(i, cv::CC_STAT_AREA);
+            if(area < 50) //面积小于80的连通域去掉
+            {
+                out_img.setTo(0, labels == i);
+            }
+        }
+        // cv::imshow("After connectedComponentsWithStats", out_img);
         //封闭区域洞填充
-        cv::Mat morph_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-        cv::morphologyEx(out_img, out_img, cv::MORPH_CLOSE, morph_kernel);
+        // cv::Mat morph_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+        // cv::morphologyEx(out_img, out_img, cv::MORPH_CLOSE, morph_kernel);
 #if PARAM_CONFIG_DEBUG
-        if(setting.isDebug())
-            cv::imshow("After morphologyEx", out_img);
+//         if(setting.isDebug())
+//             cv::imshow("After morphologyEx", out_img);
 #endif
         std::vector<std::vector<cv::Point>> contours;
         //找出所有轮廓

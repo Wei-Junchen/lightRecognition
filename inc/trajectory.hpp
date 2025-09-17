@@ -19,19 +19,38 @@ namespace Trajectory
         float yaw = -std::atan2(target_position.x, target_position.z) * 180.0f / CV_PI; //x < 0 ,z > 0时，yaw > 0
         float distance = std::sqrt(target_position.x * target_position.x + target_position.z * target_position.z);
         
+        // 检查抛物线是否有解：当 gravity * distance > bulletSpeed^2 时无解
+        float discriminant = gravity * distance / (bulletSpeed * bulletSpeed);
+        if(discriminant > 1.0f)
+        {
+            // 抛物线无解，目标距离太远
+            return cv::Vec3f(0.0f, 0.0f, 0.0f);
+        }
+        
         float pitch1 = atan2(gravity * distance, bulletSpeed * bulletSpeed * 2.0f) * 180.0f / CV_PI; //抛物线最高点在目标前方时，pitch > 0
         float pitch2 = 90.0f - pitch1; //抛物线最高点在目标后方时，pitch < 0
-        // std::cout<<"pitch1: "<<pitch1<<", pitch2: "<<pitch2<<std::endl;
+        
         float t1 = distance / (bulletSpeed * std::cos(pitch1 * CV_PI / 180.0f));
         float t2 = distance / (bulletSpeed * std::cos(pitch2 * CV_PI / 180.0f));
-        if(t1 < t2)
+        
+        // 检查时间是否为正值
+        if(t1 <= 0.0f && t2 <= 0.0f)
+            return cv::Vec3f(0.0f, 0.0f, 0.0f);
+        
+        // 选择较小的正时间
+        if(t1 > 0.0f && t2 > 0.0f)
         {
+            if(t1 < t2)
+                return cv::Vec3f(yaw, pitch1, t1);
+            else
+                return cv::Vec3f(yaw, pitch2, t2);
+        }
+        else if(t1 > 0.0f)
             return cv::Vec3f(yaw, pitch1, t1);
-        }
-        else
-        {
+        else if(t2 > 0.0f)
             return cv::Vec3f(yaw, pitch2, t2);
-        }
+        else
+            return cv::Vec3f(0.0f, 0.0f, 0.0f);
     }
 }
 
