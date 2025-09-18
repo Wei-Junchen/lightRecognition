@@ -60,6 +60,7 @@ namespace ArmorTracker
             cv::Mat state = (cv::Mat_<float>(6,1) << armor.tvec_world.at<double>(0), armor.tvec_world.at<double>(1),
                              armor.tvec_world.at<double>(2),0,0,0);
             kf_.UpdateState(state);
+            absolute_id_ = ++global_id_;
         }
 #elif FILTER_TYPE == 2
         TrackedArmor(const Armor& armor, KalmanFilter kf = initFilter2D) : armor_(armor), kf_(kf), lostCount_(0)
@@ -143,7 +144,7 @@ namespace ArmorTracker
                                                         armor_.tvec_world.at<double>(2) + armor_.vz * dt);
         }
         int getFollowCount() const { return followCount_; }
-
+        int getAbsoluteId() const { return absolute_id_; }
     private:
         KalmanFilter kf_;
         int lostCount_; //丢失计数器
@@ -151,7 +152,9 @@ namespace ArmorTracker
         bool isCatored = false; //是否被车体关联
         int followCount_ = 0; //跟踪计数器
         std::queue<int> recent_ids_; //最近跟踪到的装甲板ID队列
+        int absolute_id_; //全局唯一ID
         static inline int maxLostCount = 1; //最大丢失计数器
+        static inline int global_id_ = 0; //全局唯一ID计数器
     };
     
     std::vector<TrackedArmor> trackedArmors;

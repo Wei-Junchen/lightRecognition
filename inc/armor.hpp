@@ -178,6 +178,11 @@ public:
     }
     ~Armor() = default;
     
+    cv::Point2f getCenter() const
+    {
+        return box.center;
+    }
+    
     static void setFrame(std::shared_ptr<cv::Mat> f)
     {
         Armor::frame = f;
