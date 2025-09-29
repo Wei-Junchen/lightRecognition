@@ -65,8 +65,24 @@ public:
             for(int i=0;i<2;++i)
             {
                 cv::circle(img, (armor.lights[i].vertices[0] + armor.lights[i].vertices[1]) / 2, 3, cv::Scalar(i==0?255:0 , 0 , i==0?0:255),-1);
+                // cv::putText(img, std::to_string(((armor.lights[i].vertices[0] + armor.lights[i].vertices[1]) / 2).x), (armor.lights[i].vertices[0] + armor.lights[i].vertices[1]) / 2 - cv::Point2f(20,30),
+                //             cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
+                // cv::putText(img, std::to_string(((armor.lights[i].vertices[0] + armor.lights[i].vertices[1]) / 2).y), (armor.lights[i].vertices[0] + armor.lights[i].vertices[1]) / 2 - cv::Point2f(20,10),
+                //             cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
                 cv::circle(img, armor.lights[i].center,3,cv::Scalar(255,0,255),-1);
+
+                // cv::putText(img, std::to_string(armor.lights[i].center.x), armor.lights[i].center - cv::Point2f(20,10),
+                //             cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
+                    
+                // cv::putText(img, std::to_string(armor.lights[i].center.y), armor.lights[i].center - cv::Point2f(20,-10),
+                //             cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
+
                 cv::circle(img, (armor.lights[i].vertices[2] + armor.lights[i].vertices[3]) / 2, 3, cv::Scalar(i==0?0:255 , 0 , i==0?255:0),-1);
+                
+                // cv::putText(img, std::to_string(((armor.lights[i].vertices[2] + armor.lights[i].vertices[3]) / 2).x), (armor.lights[i].vertices[2] + armor.lights[i].vertices[3]) / 2 - cv::Point2f(20,-10),
+                //             cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
+                // cv::putText(img, std::to_string(((armor.lights[i].vertices[2] + armor.lights[i].vertices[3]) / 2).y), (armor.lights[i].vertices[2] + armor.lights[i].vertices[3]) / 2 - cv::Point2f(20,-30),
+                //             cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 255, 0), 2);
 
             }
             //画出装甲板的最小外接矩形
@@ -169,7 +185,7 @@ public:
         center_distance = cv::norm(tvec);
         //转换到世界坐标系
         Transformation::transformToWorldCoord(rvec, tvec, tvec_world, rmat_world);
-        std::cout<<"rmat_world:"<<std::endl<<rmat_world<<std::endl;
+        // std::cout<<"rmat_world:"<<std::endl<<rmat_world<<std::endl;
         //计算世界系下的rvec的x分量的指向
         cv::Mat armor_x = rmat_world.inv() * (cv::Mat_<double>(3,1) << 1.0, 0.0, 0.0);
         angle_world = std::atan2(armor_x.at<double>(2,0), armor_x.at<double>(0,0)) * 180.0 / CV_PI;
@@ -207,6 +223,7 @@ private:
     double center_distance;
     inline static size_t totalArmor = 0; //总识别到的装甲板数
     double vx = 0.0, vy = 0.0, vz = 0.0; //速度
+
     cv::Point3d predict_position; //预测位置
     cv::Mat tvec_world; //世界坐标系下的tvec
     cv::Mat rmat_world; //世界坐标系下的旋转矩阵

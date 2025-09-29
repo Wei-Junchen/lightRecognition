@@ -5,38 +5,15 @@
 #include "filter.hpp"
 #include <vector>
 #include <queue>
-
-#define FILTER_TYPE 1 //1 for 3D filter, 2 for 2D filter
+#include <Eigen/Dense>
 
 namespace Shooter { class CapableTrajectory; }
 class Car;
 
 namespace
 {
-    constexpr double pixel_distance_threshold = 300.0f; //像素距离阈值，超过这个距离就不匹配了
-    //tvec_world三维位置+三维速度卡尔曼滤波器
-    constexpr int MEASURE_DIM = 3;
-    constexpr int STATE_DIM = 6;
-    //初始化卡尔曼滤波器
-    KalmanFilter initFilter(STATE_DIM, MEASURE_DIM, ArmorFilter::transitionMatrix, ArmorFilter::measurementMatrix, cv::Mat(), ArmorFilter::makeProcessNoiseCov6(ArmorFilter::dt,10000.0f), ArmorFilter::measurementNoiseCov,
-                        (cv::Mat_<double>(6,6) <<    1,0,0,0,0,0,
-                                                    0,1,0,0,0,0,
-                                                    0,0,1,0,0,0,
-                                                    0,0,0,100,0,0,
-                                                    0,0,0,0,100,0,
-                                                    0,0,0,0,0,1000));//速度初始方差设置大一点，因为只能观测位置
-    //平面像素位置+二维速度卡尔曼滤波器
-    constexpr int MEASURE_DIM_2D = 2;
-    constexpr int STATE_DIM_2D = 4;
-    KalmanFilter initFilter2D(STATE_DIM_2D, MEASURE_DIM_2D, ArmorFilter::transitionMatrix2D, ArmorFilter::measurementMatrix2D, cv::Mat(), ArmorFilter::processNoiseCov2D, ArmorFilter::measurementNoiseCov2D,
-                           (cv::Mat_<double>(4,4) << 1,0,0,0,
-                                                    0,1,0,0,
-                                                    0,0,1,0,
-                                                    0,0,0,1));//速度初始方差设置大一点，因为只能观测位置s
+    constexpr double pixel_distance_threshold = 200.0f; //像素距离阈值，超过这个距离就不匹配了
 }
-
-//注意他tvec为double类型，下面使用template索引时要注意，而且我从double窄化为double了
-//todo: 这里可以考虑把v也改为double类型
 
 namespace ArmorTracker
 {
@@ -47,64 +24,46 @@ namespace ArmorTracker
     public:
         static void HungarianMatch(std::vector<Armor>& detectedArmors);
         static void predictTrackedArmors(double dt);
-#if FILTER_TYPE == 1
-        TrackedArmor(const Armor& armor, KalmanFilter kf = initFilter) : armor_(armor), kf_(kf), lostCount_(0)
-        {
-            cv::Mat state = (cv::Mat_<double>(6,1) << armor.tvec_world.at<double>(0), armor.tvec_world.at<double>(1),
-                             armor.tvec_world.at<double>(2),0,0,0);
-            kf_.UpdateState(state);
-            absolute_id_ = ++global_id_;
-        }
-#elif FILTER_TYPE == 2
-        TrackedArmor(const Armor& armor, KalmanFilter kf = initFilter2D) : armor_(armor), kf_(kf), lostCount_(0)
-        {
-            cv::Mat state = (cv::Mat_<double>(4,1) << armor.box.center.x, armor.box.center.y,
-                             0  ,0);
-            kf_.UpdateState(state);
-        }
-#endif
-        void PredictAndUpdate()
-        {
-            cv::Mat prediction = kf_.PredictAndUpdate();
-#if FILTER_TYPE == 1
-            armor_.tvec_world.at<double>(0) = prediction.at<double>(0);
-            armor_.tvec_world.at<double>(1) = prediction.at<double>(1);
-            armor_.tvec_world.at<double>(2) = prediction.at<double>(2);
-            armor_.vx = prediction.at<double>(3);
-            armor_.vy = prediction.at<double>(4);
-            armor_.vz = prediction.at<double>(5);
-#elif FILTER_TYPE == 2
-            armor_.box.center.x = prediction.at<double>(0);
-            armor_.box.center.y = prediction.at<double>(1);
-            armor_.vx = prediction.at<double>(2);
-            armor_.vy = prediction.at<double>(3);
-#endif
-        }
-        cv::Mat PredictWithoutUpdate()
-        {
-            return kf_.PredictWithoutUpdate();
-        }
-        void update(const Armor& detectedArmor)
+
+        TrackedArmor(const Armor& armor) : 
+            armor_(armor),lostCount_(0),
+            ekf_(Eigen::Vector<double,9>((Eigen::Vector<double,9>() 
+            <<  armor.tvec_world.at<double>(0),
+                armor.tvec_world.at<double>(1),
+                armor.tvec_world.at<double>(2),
+                0,
+                0,
+                0,
+                armor.angle_world,0,0).finished())) { absolute_id_ = ++global_id_; }
+        ~TrackedArmor() = default;
+
+        void update(const Armor& detectedArmor,double dt = 0.02)
         {
             lostCount_ = 0; //重置丢失计数器
             if(followCount_ >= 2)
                 recent_ids_.push(detectedArmor.id);
             if(recent_ids_.size() > 10) //只保留最近10个
                 recent_ids_.pop();
-#if FILTER_TYPE == 1
-            cv::Mat measurement = (cv::Mat_<double>(3,1) << detectedArmor.tvec_world.at<double>(0),
-                                   detectedArmor.tvec_world.at<double>(1),
-                                   detectedArmor.tvec_world.at<double>(2));
-            cv::Mat estimated = kf_.PredictAndUpdate(measurement);
-            std::cout<<"estimated state: " << estimated.t() << std::endl;
+
+            Eigen::Vector<double,4> measurement = (Eigen::Vector<double,4>() << 
+                detectedArmor.tvec_world.at<double>(0),
+                detectedArmor.tvec_world.at<double>(1),
+                detectedArmor.tvec_world.at<double>(2),
+                detectedArmor.angle_world).finished();
+
+            Eigen::Vector<double,9> state_merged = ekf_.PredictAndUpdate(measurement, dt);
+
+            // std::cout<<"estimated state: " << state_merged.transpose() << std::endl;
+
             int tmpid = armor_.id_car;
             armor_ = detectedArmor;
-            armor_.tvec_world.at<double>(0) = estimated.at<double>(0);
-            armor_.tvec_world.at<double>(1) = estimated.at<double>(1);
-            armor_.tvec_world.at<double>(2) = estimated.at<double>(2);
-            armor_.vx = estimated.at<double>(3);
-            armor_.vy = estimated.at<double>(4);
-            armor_.vz = estimated.at<double>(5);
+            armor_.tvec_world.at<double>(0) = state_merged(0);
+            armor_.tvec_world.at<double>(1) = state_merged(1);
+            armor_.tvec_world.at<double>(2) = state_merged(2);
+            armor_.vx = state_merged(3);
+            armor_.vy = state_merged(4);
+            armor_.vz = state_merged(5);
+
             armor_.id_car = tmpid;
             // 计算recent_ids_队列中众数
             std::queue<int> temp = recent_ids_;
@@ -115,17 +74,8 @@ namespace ArmorTracker
             }
             armor_.id = (freq_map.size() > 0) ? std::max_element(freq_map.begin(), freq_map.end(),
                 [](const auto& a, const auto& b) { return a.second < b.second; })->first : detectedArmor.id;
-#elif FILTER_TYPE == 2
-            cv::Mat measurement = (cv::Mat_<double>(2,1) << detectedArmor.box.center.x,
-                                   detectedArmor.box.center.y);
-            cv::Mat estimated = kf_.PredictAndUpdate(measurement);
-            armor_ = detectedArmor;
-            armor_.box.center.x = estimated.at<double>(0);
-            armor_.box.center.y = estimated.at<double>(1);
-            armor_.vx = estimated.at<double>(2);
-            armor_.vy = estimated.at<double>(3);
-#endif
         }
+        
         int getLostCount() const { return lostCount_; }
         const Armor& getArmor() const { return armor_; }
 
@@ -139,7 +89,7 @@ namespace ArmorTracker
         int getFollowCount() const { return followCount_; }
         int getAbsoluteId() const { return absolute_id_; }
     private:
-        KalmanFilter kf_;
+        ExtendedKalmanFilter<9, 4> ekf_;
         int lostCount_; //丢失计数器
         Armor armor_;
         bool isCatored = false; //是否被车体关联

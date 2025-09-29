@@ -163,12 +163,10 @@ public:
 #endif
         //图像进行中值滤波
         cv::medianBlur(out_img, out_img, 3);
-
         // cv::imshow("After medianBlur", out_img);
         //连通域分析
         cv::Mat labels, stats, centroids;
         int num_labels = cv::connectedComponentsWithStats(out_img, labels, stats, centroids);
-
         //删除小连通域
         for(int i = 1; i < num_labels; i++) //从1开始，跳过背景
         {
@@ -186,11 +184,10 @@ public:
 //         if(setting.isDebug())
 //             cv::imshow("After morphologyEx", out_img);
 #endif
-        std::vector<std::vector<cv::Point2d>> contours;
+        std::vector<std::vector<cv::Point>> contours;
         //找出所有轮廓
         cv::findContours(out_img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-        // //绘画出所有轮廓
-
+        //绘画出所有轮廓
         std::vector<MyRotatedRect> boxes;
         std::vector<bool> used(contours.size(), false);
         int id_counter = 0;

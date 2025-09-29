@@ -130,7 +130,7 @@ namespace ArmorFilter
         }
 
         //measurement: [px,py,pz,theta]^T
-        Eigen::Matrix<double,4,9> measurementMatrix2D = (Eigen::Matrix<double,4,9>() <<
+        Eigen::Matrix<double,4,9> measurementMatrix = (Eigen::Matrix<double,4,9>() <<
             1,0,0,0,0,0,0,0,0,
             0,1,0,0,0,0,0,0,0,
             0,0,1,0,0,0,0,0,0,
@@ -158,9 +158,19 @@ namespace ArmorFilter
 
 //N为状态维度，M为观测维度
 template<size_t N, size_t M>
-class ExtendKalmanFilter
+class ExtendedKalmanFilter
 {
 public:
+    ExtendedKalmanFilter(Eigen::Vector<double,N> init_state = Eigen::Vector<double,N>::Zero(),
+                         Eigen::Matrix<double,N,N> P = Eigen::Matrix<double,N,N>::Identity(),
+                         Eigen::Matrix<double,M,N> H = ArmorFilter::EKF::measurementMatrix,
+                         Eigen::Matrix<double,N,N> Q = ArmorFilter::EKF::processNoiseCov,
+                         Eigen::Matrix<double,M,M> R = ArmorFilter::EKF::measurementNoiseCov,
+                         std::function<Eigen::Vector<double,N>(Eigen::Vector<double,N>,double)> f = ArmorFilter::EKF::f,
+                         std::function<Eigen::Matrix<double,N,N>(Eigen::Vector<double,N>,double)> F = ArmorFilter::EKF::f_jacobian)
+        : state_(init_state), H_(H), P_(P), Q_(Q), R_(R), f_(f), F_(F) {}
+
+
     Eigen::Vector<double,N> PredictAndUpdate(Eigen::Vector<double,M> const& z,double dt)
     {
         //计算state先验值
@@ -180,6 +190,10 @@ public:
         Eigen::Matrix<double,N,N> I = Eigen::Matrix<double,N,N>::Identity();
         // 使用 Joseph 形式更新 P，数值稳定性更好
         P_ = (I - K * H_) * P_pre * (I - K * H_).transpose() + K * R_ * K.transpose();
+
+        // std::cout<<"observation: "<<z.transpose()<<std::endl;
+        // std::cout<<"predicted state: "<<state_pre.transpose()<<std::endl;
+        // std::cout<<"updated state: "<<state_.transpose()<<std::endl;
         return state_;
     }
 private:
