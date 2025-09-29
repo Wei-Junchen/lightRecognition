@@ -120,8 +120,9 @@ int main(int argc,char** argv)
 
         Car::updateFromTrackedArmors(ArmorTracker::trackedArmors);
         ArmorTracker::getTrackedArmors(armors);
-        
         Armor::DrawArmor(*frame, armors);
+        // Car::calculateCarsCenter();
+        Car::DrawCars(*frame);
 
         if (elapsed.count() > 0)
         {

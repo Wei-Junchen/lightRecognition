@@ -7,13 +7,14 @@
 
 namespace ArmorTracker { class TrackedArmor; }
 namespace Shooter { class CapableTrajectory; }
+class Car;
 
 struct MyRotatedRect
 {
     cv::Point2f vertices[4];
     cv::Point2f center;
     cv::Size2f size;
-    float angle;
+    double angle;
     int id;
 };
 
@@ -46,13 +47,14 @@ class Armor
 {
     friend class ArmorTracker::TrackedArmor;
     friend class Shooter::CapableTrajectory;
+    friend class Car;
 public:
     static void DrawArmor(cv::Mat& img,const std::vector<Armor>& armors)
     {
         for(const auto& armor : armors)
         {
-            if(armor.id_car == -1)
-                continue;
+            // if(armor.id_car == -1)
+            //     continue;
             //画出两个灯条
             for(int i = 0; i < 4; i++)
                 cv::line(img, armor.lights[0].vertices[i], armor.lights[0].vertices[(i+1)%4], cv::Scalar(0, 255, 0), 2);
@@ -62,9 +64,9 @@ public:
             cv::circle(img, (armor.lights[0].center + armor.lights[1].center) / 2, 6, cv::Scalar(0, 255 , 255));
             for(int i=0;i<2;++i)
             {
-                cv::circle(img, (armor.lights[i].vertices[0] + armor.lights[i].vertices[1]) / 2, 3, cv::Scalar(255 , 0 , 255),-1);
+                cv::circle(img, (armor.lights[i].vertices[0] + armor.lights[i].vertices[1]) / 2, 3, cv::Scalar(i==0?255:0 , 0 , i==0?0:255),-1);
                 cv::circle(img, armor.lights[i].center,3,cv::Scalar(255,0,255),-1);
-                cv::circle(img, (armor.lights[i].vertices[2] + armor.lights[i].vertices[3]) / 2, 3, cv::Scalar(255 , 0 , 255),-1);
+                cv::circle(img, (armor.lights[i].vertices[2] + armor.lights[i].vertices[3]) / 2, 3, cv::Scalar(i==0?0:255 , 0 , i==0?255:0),-1);
 
             }
             //画出装甲板的最小外接矩形
@@ -84,8 +86,8 @@ public:
 
             // std::cout<<armor.predict_position<<std::endl;
             Transformation::projectWorldPointToImage(armor.predict_position,img);
+
         }
-        
     }
     Armor() = default;
     Armor(MyRotatedRect light1, MyRotatedRect light2, int type): type(type)
@@ -159,17 +161,20 @@ public:
         // cv::namedWindow("box_image" + std::to_string(id), cv::WINDOW_NORMAL);
         // cv::imshow("box_image" + std::to_string(id), box_image);
 
-        Transformation::solvePnP(std::vector<cv::Point2f>{(lights[0].vertices[0] + lights[0].vertices[1])/2.0,lights[0].center,(lights[0].vertices[3]+lights[0].vertices[2])/2.0,
+        Transformation::solvePnP(std::vector<cv::Point2d>{(lights[0].vertices[0] + lights[0].vertices[1])/2.0,lights[0].center,(lights[0].vertices[3]+lights[0].vertices[2])/2.0,
                                                             (lights[1].vertices[0] + lights[1].vertices[1])/2.0,lights[1].center,(lights[1].vertices[3]+lights[1].vertices[2])/2.0},
                                  rvec, tvec);
+
         //计算装甲板距离
         center_distance = cv::norm(tvec);
         //转换到世界坐标系
         Transformation::transformToWorldCoord(rvec, tvec, tvec_world, rmat_world);
+        std::cout<<"rmat_world:"<<std::endl<<rmat_world<<std::endl;
         //计算世界系下的rvec的x分量的指向
-        cv::Mat tmp;
-        rmat_world.col(0).copyTo(tmp); // 世界系rvec (3x1)
-        angle_world = std::atan2(tmp.at<double>(2,0), tmp.at<double>(0,0)) * 180.0 / CV_PI;
+        cv::Mat armor_x = rmat_world.inv() * (cv::Mat_<double>(3,1) << 1.0, 0.0, 0.0);
+        angle_world = std::atan2(armor_x.at<double>(2,0), armor_x.at<double>(0,0)) * 180.0 / CV_PI;
+        //预测
+        std::cout<<"angle_world: "<<angle_world<<std::endl;
     } 
     //获取装甲板ID，使用CNN识别，用DNN导入模型
     int getId() const
@@ -178,7 +183,7 @@ public:
     }
     ~Armor() = default;
     
-    cv::Point2f getCenter() const
+    cv::Point getCenter() const
     {
         return box.center;
     }
@@ -199,10 +204,10 @@ private:
     MyRotatedRect lights[2];
     cv::Mat rvec;   //旋转向量
     cv::Mat tvec;   //平移向量
-    float center_distance;
+    double center_distance;
     inline static size_t totalArmor = 0; //总识别到的装甲板数
-    float vx = 0.0f, vy = 0.0f, vz = 0.0f; //速度
-    cv::Point3f predict_position; //预测位置
+    double vx = 0.0, vy = 0.0, vz = 0.0; //速度
+    cv::Point3d predict_position; //预测位置
     cv::Mat tvec_world; //世界坐标系下的tvec
     cv::Mat rmat_world; //世界坐标系下的旋转矩阵
     double angle_world; //世界坐标系下的rvec的x分量的指向

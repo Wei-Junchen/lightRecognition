@@ -12,11 +12,11 @@ namespace
     bool isRectPaired(MyRotatedRect box1, MyRotatedRect box2)
     {
         //计算两个矩形中心点距离
-        float center_dist = cv::norm(box1.center - box2.center);
+        double center_dist = cv::norm(box1.center - box2.center);
         //计算两个矩形宽度平均值
-        float avg_width = (box1.size.width + box2.size.width) / 2.0;
+        double avg_width = (box1.size.width + box2.size.width) / 2.0;
         //计算两个矩形角度差,不用默认的angle属性，因为angle属性在某些情况下会有180度的偏差，而是通过height所在边与水平线的夹角来计算
-        float angle_diff = box1.angle - box2.angle;
+        double angle_diff = box1.angle - box2.angle;
         //归一化到[-90, 90]范围
         if(angle_diff > 90)
             angle_diff = 180 - angle_diff;
@@ -24,18 +24,18 @@ namespace
             angle_diff = -180 - angle_diff;
 
         //计算两个矩形中心连线 与水平线夹角
-        float center_line_angle = std::atan2(box2.center.y - box1.center.y, box2.center.x - box1.center.x) * 180.0f / CV_PI;
+        double center_line_angle = std::atan2(box2.center.y - box1.center.y, box2.center.x - box1.center.x) * 180.0f / CV_PI;
         if(center_line_angle < 0.0f)
             center_line_angle += 180.0f;
             
         //计算两个矩形角度与中心连线夹角差
-        float angle_diff1 = box1.angle - center_line_angle;
+        double angle_diff1 = box1.angle - center_line_angle;
         //归一化到[-90, 90]范围
         if(angle_diff1 > 90)
             angle_diff1 = 180 - angle_diff1;
         else if(angle_diff1 < -90)
             angle_diff1 = -180 - angle_diff1;
-        float angle_diff2 = box2.angle - center_line_angle;
+        double angle_diff2 = box2.angle - center_line_angle;
         //归一化到[-90, 90]范围
         if(angle_diff2 > 90)
             angle_diff2 = 180 - angle_diff2;
@@ -186,7 +186,7 @@ public:
 //         if(setting.isDebug())
 //             cv::imshow("After morphologyEx", out_img);
 #endif
-        std::vector<std::vector<cv::Point>> contours;
+        std::vector<std::vector<cv::Point2d>> contours;
         //找出所有轮廓
         cv::findContours(out_img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
         // //绘画出所有轮廓
@@ -203,9 +203,9 @@ public:
             MyRotatedRect mybox;
             box.points(mybox.vertices);
 
-            float dist = cv::norm(mybox.vertices[0] - mybox.vertices[1]);
-            float dist1 = cv::norm(mybox.vertices[1] - mybox.vertices[2]);
-            float angle;
+            double dist = cv::norm(mybox.vertices[0] - mybox.vertices[1]);
+            double dist1 = cv::norm(mybox.vertices[1] - mybox.vertices[2]);
+            double angle;
             if(dist > dist1)
                 angle = std::atan2(mybox.vertices[0].y - mybox.vertices[1].y, mybox.vertices[0].x - mybox.vertices[1].x) * 180.0f / CV_PI;
             else
@@ -228,7 +228,7 @@ public:
             // cv::putText(*src_img,std::to_string(mybox.id),box.center, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 255), 1);
             //在灯条上显示角度和长短边像素
             // cv::putText(*src_img,
-            //             "Angle: " + std::to_string(float(mybox.angle)) + ", H: " + std::to_string(float(mybox.size.height)) + ", W: " + std::to_string(float(mybox.size.width)),
+            //             "Angle: " + std::to_string(double(mybox.angle)) + ", H: " + std::to_string(double(mybox.size.height)) + ", W: " + std::to_string(double(mybox.size.width)),
             //             box.center, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 255), 1);
                 
         }

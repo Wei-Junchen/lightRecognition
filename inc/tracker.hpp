@@ -13,20 +13,13 @@ class Car;
 
 namespace
 {
-    constexpr float pixel_distance_threshold = 300.0f; //像素距离阈值，超过这个距离就不匹配了
+    constexpr double pixel_distance_threshold = 300.0f; //像素距离阈值，超过这个距离就不匹配了
     //tvec_world三维位置+三维速度卡尔曼滤波器
     constexpr int MEASURE_DIM = 3;
     constexpr int STATE_DIM = 6;
     //初始化卡尔曼滤波器
-    // KalmanFilter initFilter(STATE_DIM, MEASURE_DIM, ArmorFilter::transitionMatrix, ArmorFilter::measurementMatrix, cv::Mat(), ArmorFilter::processNoiseCov, ArmorFilter::measurementNoiseCov,
-    //                        (cv::Mat_<float>(6,6) << 1,0,0,0,0,0,
-    //                                                 0,1,0,0,0,0,
-    //                                                 0,0,10,0,0,0,
-    //                                                 0,0,0,100,0,0,
-    //                                                 0,0,0,0,100,0,
-    //                                                 0,0,0,0,0,1000));//速度初始方差设置大一点，因为只能观测位置
     KalmanFilter initFilter(STATE_DIM, MEASURE_DIM, ArmorFilter::transitionMatrix, ArmorFilter::measurementMatrix, cv::Mat(), ArmorFilter::makeProcessNoiseCov6(ArmorFilter::dt,10000.0f), ArmorFilter::measurementNoiseCov,
-                        (cv::Mat_<float>(6,6) <<    1,0,0,0,0,0,
+                        (cv::Mat_<double>(6,6) <<    1,0,0,0,0,0,
                                                     0,1,0,0,0,0,
                                                     0,0,1,0,0,0,
                                                     0,0,0,100,0,0,
@@ -36,13 +29,13 @@ namespace
     constexpr int MEASURE_DIM_2D = 2;
     constexpr int STATE_DIM_2D = 4;
     KalmanFilter initFilter2D(STATE_DIM_2D, MEASURE_DIM_2D, ArmorFilter::transitionMatrix2D, ArmorFilter::measurementMatrix2D, cv::Mat(), ArmorFilter::processNoiseCov2D, ArmorFilter::measurementNoiseCov2D,
-                           (cv::Mat_<float>(4,4) << 1,0,0,0,
+                           (cv::Mat_<double>(4,4) << 1,0,0,0,
                                                     0,1,0,0,
                                                     0,0,1,0,
                                                     0,0,0,1));//速度初始方差设置大一点，因为只能观测位置
 }
 
-//注意他tvec为double类型，下面使用template索引时要注意，而且我从double窄化为float了
+//注意他tvec为double类型，下面使用template索引时要注意，而且我从double窄化为double了
 //todo: 这里可以考虑把v也改为double类型
 
 namespace ArmorTracker
@@ -53,11 +46,11 @@ namespace ArmorTracker
         friend class ::Car;
     public:
         static void HungarianMatch(std::vector<Armor>& detectedArmors);
-        static void predictTrackedArmors(float dt);
+        static void predictTrackedArmors(double dt);
 #if FILTER_TYPE == 1
         TrackedArmor(const Armor& armor, KalmanFilter kf = initFilter) : armor_(armor), kf_(kf), lostCount_(0)
         {
-            cv::Mat state = (cv::Mat_<float>(6,1) << armor.tvec_world.at<double>(0), armor.tvec_world.at<double>(1),
+            cv::Mat state = (cv::Mat_<double>(6,1) << armor.tvec_world.at<double>(0), armor.tvec_world.at<double>(1),
                              armor.tvec_world.at<double>(2),0,0,0);
             kf_.UpdateState(state);
             absolute_id_ = ++global_id_;
@@ -65,7 +58,7 @@ namespace ArmorTracker
 #elif FILTER_TYPE == 2
         TrackedArmor(const Armor& armor, KalmanFilter kf = initFilter2D) : armor_(armor), kf_(kf), lostCount_(0)
         {
-            cv::Mat state = (cv::Mat_<float>(4,1) << armor.box.center.x, armor.box.center.y,
+            cv::Mat state = (cv::Mat_<double>(4,1) << armor.box.center.x, armor.box.center.y,
                              0  ,0);
             kf_.UpdateState(state);
         }
@@ -74,17 +67,17 @@ namespace ArmorTracker
         {
             cv::Mat prediction = kf_.PredictAndUpdate();
 #if FILTER_TYPE == 1
-            armor_.tvec_world.at<double>(0) = prediction.at<float>(0);
-            armor_.tvec_world.at<double>(1) = prediction.at<float>(1);
-            armor_.tvec_world.at<double>(2) = prediction.at<float>(2);
-            armor_.vx = prediction.at<float>(3);
-            armor_.vy = prediction.at<float>(4);
-            armor_.vz = prediction.at<float>(5);
+            armor_.tvec_world.at<double>(0) = prediction.at<double>(0);
+            armor_.tvec_world.at<double>(1) = prediction.at<double>(1);
+            armor_.tvec_world.at<double>(2) = prediction.at<double>(2);
+            armor_.vx = prediction.at<double>(3);
+            armor_.vy = prediction.at<double>(4);
+            armor_.vz = prediction.at<double>(5);
 #elif FILTER_TYPE == 2
-            armor_.box.center.x = prediction.at<float>(0);
-            armor_.box.center.y = prediction.at<float>(1);
-            armor_.vx = prediction.at<float>(2);
-            armor_.vy = prediction.at<float>(3);
+            armor_.box.center.x = prediction.at<double>(0);
+            armor_.box.center.y = prediction.at<double>(1);
+            armor_.vx = prediction.at<double>(2);
+            armor_.vy = prediction.at<double>(3);
 #endif
         }
         cv::Mat PredictWithoutUpdate()
@@ -99,19 +92,19 @@ namespace ArmorTracker
             if(recent_ids_.size() > 10) //只保留最近10个
                 recent_ids_.pop();
 #if FILTER_TYPE == 1
-            cv::Mat measurement = (cv::Mat_<float>(3,1) << detectedArmor.tvec_world.at<double>(0),
+            cv::Mat measurement = (cv::Mat_<double>(3,1) << detectedArmor.tvec_world.at<double>(0),
                                    detectedArmor.tvec_world.at<double>(1),
                                    detectedArmor.tvec_world.at<double>(2));
             cv::Mat estimated = kf_.PredictAndUpdate(measurement);
-            // std::cout<<"estimated state: " << estimated.t() << std::endl;
+            std::cout<<"estimated state: " << estimated.t() << std::endl;
             int tmpid = armor_.id_car;
             armor_ = detectedArmor;
-            armor_.tvec_world.at<double>(0) = estimated.at<float>(0);
-            armor_.tvec_world.at<double>(1) = estimated.at<float>(1);
-            armor_.tvec_world.at<double>(2) = estimated.at<float>(2);
-            armor_.vx = estimated.at<float>(3);
-            armor_.vy = estimated.at<float>(4);
-            armor_.vz = estimated.at<float>(5);
+            armor_.tvec_world.at<double>(0) = estimated.at<double>(0);
+            armor_.tvec_world.at<double>(1) = estimated.at<double>(1);
+            armor_.tvec_world.at<double>(2) = estimated.at<double>(2);
+            armor_.vx = estimated.at<double>(3);
+            armor_.vy = estimated.at<double>(4);
+            armor_.vz = estimated.at<double>(5);
             armor_.id_car = tmpid;
             // 计算recent_ids_队列中众数
             std::queue<int> temp = recent_ids_;
@@ -123,20 +116,20 @@ namespace ArmorTracker
             armor_.id = (freq_map.size() > 0) ? std::max_element(freq_map.begin(), freq_map.end(),
                 [](const auto& a, const auto& b) { return a.second < b.second; })->first : detectedArmor.id;
 #elif FILTER_TYPE == 2
-            cv::Mat measurement = (cv::Mat_<float>(2,1) << detectedArmor.box.center.x,
+            cv::Mat measurement = (cv::Mat_<double>(2,1) << detectedArmor.box.center.x,
                                    detectedArmor.box.center.y);
             cv::Mat estimated = kf_.PredictAndUpdate(measurement);
             armor_ = detectedArmor;
-            armor_.box.center.x = estimated.at<float>(0);
-            armor_.box.center.y = estimated.at<float>(1);
-            armor_.vx = estimated.at<float>(2);
-            armor_.vy = estimated.at<float>(3);
+            armor_.box.center.x = estimated.at<double>(0);
+            armor_.box.center.y = estimated.at<double>(1);
+            armor_.vx = estimated.at<double>(2);
+            armor_.vy = estimated.at<double>(3);
 #endif
         }
         int getLostCount() const { return lostCount_; }
         const Armor& getArmor() const { return armor_; }
 
-        void predictArmors(float dt)
+        void predictArmors(double dt)
         {
             //更新所有跟踪装甲板的预测位置
                 armor_.predict_position = cv::Point3f(armor_.tvec_world.at<double>(0) + armor_.vx * dt,
@@ -173,8 +166,8 @@ namespace ArmorTracker
                 因为装甲板匹配是通过两帧之间的距离来判断的，
                 不是tvec(像素匹配更简单而且直观，符合人眼观测规律)
             */
-            float distance_to_camera = cv::norm(tracked.armor_.tvec_world);
-            float min_distance = pixel_distance_threshold /( distance_to_camera * 1e-3); //距离越远，允许的像素距离小
+            double distance_to_camera = cv::norm(tracked.armor_.tvec_world);
+            double min_distance = pixel_distance_threshold /( distance_to_camera * 1e-3); //距离越远，允许的像素距离小
             // std::cout<<"min_distance: " << min_distance << std::endl;
             int min_index = -1;
             for(size_t i = 0; i < detectedArmors.size(); i++)
@@ -182,7 +175,7 @@ namespace ArmorTracker
                 if(matched[i])
                     continue;
                 cv::Point2f predict_center(tracked.armor_.box.center.x, tracked.armor_.box.center.y);
-                float distance = cv::norm(predict_center - detectedArmors[i].box.center);
+                double distance = cv::norm(predict_center - detectedArmors[i].box.center);
                 // std::cout<<"distance: " << distance << std::endl;
                 if(distance < min_distance)
                 {
@@ -221,7 +214,7 @@ namespace ArmorTracker
         }
     }
 
-    void TrackedArmor::predictTrackedArmors(float dt)
+    void TrackedArmor::predictTrackedArmors(double dt)
     {
         //更新所有跟踪装甲板的预测位置
         for(auto& tracked : trackedArmors)

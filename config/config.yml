@@ -5,4 +5,4 @@ target:
 debug: false
 terminal_output: false
 # normal or step
-playmode: normal
+playmode: norma

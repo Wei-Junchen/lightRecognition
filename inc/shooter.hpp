@@ -7,9 +7,9 @@
 
 namespace
 {
-    float step = 0.02f; //s
-    float max_error = 0.02f; //s
-    float dt_max = 1.0f; //s
+    double step = 0.02f; //s
+    double max_error = 0.02f; //s
+    double dt_max = 1.0f; //s
 }
 
 namespace Shooter
@@ -24,11 +24,11 @@ namespace Shooter
             std::cout << "Root min: " << root_min << ", Root max: " << root_max << ", dt: " << dt << ", tracked_index: " << tracked_index << std::endl;
         }
         int getTrackedIndex() const { return tracked_index; }
-        float getDt() const { return dt; }
+        double getDt() const { return dt; }
     private:
         cv::Vec3f root_min; //yaw,pitch,time
         cv::Vec3f root_max; //yaw,pitch,time
-        float dt; //时间增量
+        double dt; //时间增量
         int tracked_index; //被跟踪的装甲板在trackedArmors中的索引
     };
 
@@ -41,7 +41,7 @@ namespace Shooter
         for(auto& tracked : ArmorTracker::trackedArmors)
         {
             bool isFoundMinRoot = false;
-            for(float t = 0; t < dt_max; t += step)
+            for(double t = 0; t < dt_max; t += step)
             {
                 ArmorTracker::TrackedArmor::predictTrackedArmors(step);
                 cv::Point3f target_pos = tracked.armor_.predict_position;

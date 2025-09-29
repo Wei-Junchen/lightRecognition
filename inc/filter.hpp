@@ -3,81 +3,156 @@
 
 #include <opencv2/opencv.hpp>
 #include <stdexcept>
+#include <functional>
 
 namespace ArmorFilter
 {
+    double dt = 0.02; //时间间隔s
 
-float dt = 0.02; //时间间隔s
+    //定义状态转移矩阵
+    cv::Mat transitionMatrix = (cv::Mat_<double>(6,6) <<
+        1,0,0,dt,0,0,
+        0,1,0,0,dt,0,
+        0,0,1,0,0,dt,
+        0,0,0,1,0,0,
+        0,0,0,0,1,0,
+        0,0,0,0,0,1);
 
-//定义状态转移矩阵
-cv::Mat transitionMatrix = (cv::Mat_<float>(6,6) <<
-    1,0,0,dt,0,0,
-    0,1,0,0,dt,0,
-    0,0,1,0,0,dt,
-    0,0,0,1,0,0,
-    0,0,0,0,1,0,
-    0,0,0,0,0,1);
+    //定义测量矩阵
+    cv::Mat measurementMatrix = (cv::Mat_<double>(3,6) <<
+        1,0,0,0,0,0,
+        0,1,0,0,0,0,
+        0,0,1,0,0,0);
 
-//定义测量矩阵
-cv::Mat measurementMatrix = (cv::Mat_<float>(3,6) <<
-    1,0,0,0,0,0,
-    0,1,0,0,0,0,
-    0,0,1,0,0,0);
+    cv::Mat measurementNoiseCov = (cv::Mat_<double>(3,3) <<
+        10,0,0,
+        0,10,0,
+        0,0,25);
 
-cv::Mat measurementNoiseCov = (cv::Mat_<float>(3,3) <<
-    5,0,0,
-    0,5,0,
-    0,0,5);
+    //定义协方差噪声矩阵
+    cv::Mat processNoiseCov = (cv::Mat_<double>(6,6) <<
+        1,0,0,0,0,0,
+        0,1,0,0,0,0,
+        0,0,100,0,0,0,
+        0,0,0,10,0,0,
+        0,0,0,0,10,0,
+        0,0,0,0,0,100);
 
-//定义协方差噪声矩阵
-cv::Mat processNoiseCov = (cv::Mat_<float>(6,6) <<
-    1,0,0,0,0,0,
-    0,1,0,0,0,0,
-    0,0,100,0,0,0,
-    0,0,0,10,0,0,
-    0,0,0,0,10,0,
-    0,0,0,0,0,100);
-
-// 示例：构造 6x6 加速度驱动 Q（double 计算然后转为 float）
-cv::Mat makeProcessNoiseCov6(float dt,double sigma_a_mm_s2) {
-    cv::Mat Q = cv::Mat::zeros(6,6, CV_64F );
-    double q11 = pow(dt,4) / 4.0;
-    double q12 = pow(dt,3) / 2.0;
-    double q22 = pow(dt,2);
-    for (int ax=0; ax<3; ++ax) {
-        Q.at<double>(ax, ax)       = q11 * sigma_a_mm_s2 * sigma_a_mm_s2;
-        Q.at<double>(ax, ax+3)     = q12 * sigma_a_mm_s2 * sigma_a_mm_s2;
-        Q.at<double>(ax+3, ax)     = q12 * sigma_a_mm_s2 * sigma_a_mm_s2;
-        Q.at<double>(ax+3, ax+3)   = q22 * sigma_a_mm_s2 * sigma_a_mm_s2;
+    // 示例：构造 6x6 加速度驱动 Q（double 计算然后转为 double）
+    cv::Mat makeProcessNoiseCov6(double dt,double sigma_a_mm_s2) {
+        cv::Mat Q = cv::Mat::zeros(6,6, CV_64F );
+        double q11 = pow(dt,4) / 4.0;
+        double q12 = pow(dt,3) / 2.0;
+        double q22 = pow(dt,2);
+        for (int ax=0; ax<3; ++ax) {
+            Q.at<double>(ax, ax)       = q11 * sigma_a_mm_s2 * sigma_a_mm_s2;
+            Q.at<double>(ax, ax+3)     = q12 * sigma_a_mm_s2 * sigma_a_mm_s2;
+            Q.at<double>(ax+3, ax)     = q12 * sigma_a_mm_s2 * sigma_a_mm_s2;
+            Q.at<double>(ax+3, ax+3)   = q22 * sigma_a_mm_s2 * sigma_a_mm_s2;
+        }
+        // convert to double for OpenCV KalmanFilter (if needed)
+        cv::Mat Qf;
+        Q.convertTo(Qf, CV_32F);
+        return Qf;
     }
-    // convert to float for OpenCV KalmanFilter (if needed)
-    cv::Mat Qf;
-    Q.convertTo(Qf, CV_32F);
-    return Qf;
-}
 
 
-//定义二维平面滤波器
-cv::Mat transitionMatrix2D = (cv::Mat_<float>(4,4) <<
-    1,0,1,0,
-    0,1,0,1,
-    0,0,1,0,
-    0,0,0,1);
+    //定义二维平面滤波器
+    cv::Mat transitionMatrix2D = (cv::Mat_<double>(4,4) <<
+        1,0,1,0,
+        0,1,0,1,
+        0,0,1,0,
+        0,0,0,1);
 
-cv::Mat measurementMatrix2D = (cv::Mat_<float>(2,4) <<
-    1,0,0,0,
-    0,1,0,0);
+    cv::Mat measurementMatrix2D = (cv::Mat_<double>(2,4) <<
+        1,0,0,0,
+        0,1,0,0);
 
-cv::Mat measurementNoiseCov2D = (cv::Mat_<float>(2,2) <<
-    1,0,
-    0,1);
+    cv::Mat measurementNoiseCov2D = (cv::Mat_<double>(2,2) <<
+        1,0,
+        0,1);
 
-cv::Mat processNoiseCov2D = (cv::Mat_<float>(4,4) <<
-    1,0,0,0,
-    0,1,0,0,
-    0,0,1,0,
-    0,0,0,1);
+    cv::Mat processNoiseCov2D = (cv::Mat_<double>(4,4) <<
+        1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        0,0,0,1);
 
+    namespace EKF
+    {
+        //state: [px,py,pz,vx,vy,vz,theta,omega,radius]^T
+        //predict_state
+        cv::Mat f(cv::Mat state, double delta_t = dt)
+        {
+            double px = state.at<double>(0);
+            double py = state.at<double>(1);
+            double pz = state.at<double>(2);
+            double vx = state.at<double>(3);
+            double vy = state.at<double>(4);
+            double vz = state.at<double>(5);
+            double th = state.at<double>(6);
+            double w = state.at<double>(7);
+            double r = state.at<double>(8);
+            return cv::Mat_<double>(9,1)<<
+                px + vx*delta_t + r*w*cos(th)*delta_t,
+                py + vy*delta_t + r*w*sin(th)*delta_t,
+                pz + vz*delta_t,
+                vx + r*w*cos(th),
+                vy + r*w*sin(th),
+                vz,
+                th + w*delta_t,
+                w,
+                r;
+        }
+
+        //state: [px,py,pz,vx,vy,vz,theta,omega,radius]^T
+        cv::Mat F(cv::Mat state,double delta_t = dt)
+        {
+            double px = state.at<double>(0);
+            double py = state.at<double>(1);
+            double pz = state.at<double>(2);
+            double vx = state.at<double>(3);
+            double vy = state.at<double>(4);
+            double vz = state.at<double>(5);
+            double th = state.at<double>(6);
+            double w = state.at<double>(7);
+            double r = state.at<double>(8);
+            return cv::Mat_<double>(9,9)<<
+                1,0,0,delta_t,0,0,(-r*w*sin(th))*delta_t, (r*cos(th))*delta_t, (w*cos(th))*delta_t,
+                0,1,0,0,delta_t,0,( r*w*cos(th))*delta_t, (r*sin(th))*delta_t, (w*sin(th))*delta_t,
+                0,0,1,0,0,delta_t,0,0,0,
+                0,0,0,1,0,0,(-r*w*sin(th)), (r*cos(th)), (w*cos(th)),
+                0,0,0,0,1,0,( r*w*cos(th)), (r*sin(th)), (w*sin(th)),
+                0,0,0,0,0,1,0,0,0,
+                0,0,0,0,0,0,1,delta_t,0,
+                0,0,0,0,0,0,0,1,0,
+                0,0,0,0,0,0,0,0,1;
+        }
+
+        //measurement: [px,py,pz,theta]^T
+        cv::Mat measurementMatrix = (cv::Mat_<double>(4,9) <<
+            1,0,0,0,0,0,0,0,0,
+            0,1,0,0,0,0,0,0,0,
+            0,0,1,0,0,0,0,0,0,
+            0,0,0,0,0,0,1,0,0);
+
+        cv::Mat measurementNoiseCov = (cv::Mat_<double>(4,4) <<
+            10,0,0,0,
+            0,10,0,0,
+            0,0,25,0,
+            0,0,0,(2.0f/180.0f)*CV_PI); //角度标准差2度
+
+        cv::Mat processNoiseCov = (cv::Mat_<double>(9,9) <<
+            1,0,0,0,0,0,0,0,0,
+            0,1,0,0,0,0,0,0,0,
+            0,0,100,0,0,0,0,0,0,
+            0,0,0,10,0,0,0,0,0,
+            0,0,0,0,10,0,0,0,0,
+            0,0,0,0,0,100,0,0,0,
+            0,0,0,0,0,0,1,0,0,
+            0,0,0,0,0,0,0,1,0,
+            0,0,0,0,0,0,0,0,50);
+    }
 
 }
 
@@ -244,6 +319,45 @@ private:
     cv::Mat H_;
     cv::Mat Q_;
     cv::Mat R_;
+};
+
+class ExtendKalmanFilter
+{
+public:
+    cv::Mat PredictAndUpdate(const cv::Mat& z)
+    {
+        //计算state先验值
+        cv::Mat state_pre = f_(state_,dt);
+        cv::Mat F = F_(state_,dt);
+        //计算协方差P的先验值
+        cv::Mat P_pre = F*P_*F.t() + Q_;
+        //计算Kalman Gain
+        cv::Mat K = (P_pre*H_.t())*(H_*P_pre*H_.t() + R_);
+        //计算后验state
+        cv::Mat state = state_pre + K * (z - H_* state_pre);
+        //更新P_
+        cv::Mat I = cv::Mat::eye(P_.rows, P_.cols, P_.type());
+        // 更新P_ (推荐Joseph form)
+        P_ = (I - K * H_) * P_pre * (I - K * H_).t() + K * R_ * K.t();
+        return state_;
+    }
+private:
+    double dt;
+
+    cv::Mat state_;
+    //观测矩阵
+    cv::Mat H_;
+    //协方差矩阵
+    cv::Mat P_;
+    //观测噪声协方差矩阵
+    cv::Mat Q_;
+    //测量噪声协方差矩阵
+    cv::Mat R_;
+
+    //状态更新非线性函数f
+    std::function<cv::Mat(cv::Mat,double)> f_;
+    //状态更新函数f的雅可比矩阵
+    std::function<cv::Mat(cv::Mat,double)> F_;
 };
 
 #endif
