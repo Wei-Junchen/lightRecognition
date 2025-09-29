@@ -4,6 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <stdexcept>
 #include <functional>
+#include <Eigen/Dense>
 
 namespace ArmorFilter
 {
@@ -81,19 +82,18 @@ namespace ArmorFilter
     namespace EKF
     {
         //state: [px,py,pz,vx,vy,vz,theta,omega,radius]^T
-        //predict_state
-        cv::Mat f(cv::Mat state, double delta_t = dt)
+        Eigen::Vector<double,9> f(Eigen::Vector<double,9> state , double delta_t = dt)
         {
-            double px = state.at<double>(0);
-            double py = state.at<double>(1);
-            double pz = state.at<double>(2);
-            double vx = state.at<double>(3);
-            double vy = state.at<double>(4);
-            double vz = state.at<double>(5);
-            double th = state.at<double>(6);
-            double w = state.at<double>(7);
-            double r = state.at<double>(8);
-            return cv::Mat_<double>(9,1)<<
+            double px = state(0);
+            double py = state(1);
+            double pz = state(2);
+            double vx = state(3);
+            double vy = state(4);
+            double vz = state(5);
+            double th = state(6);
+            double w = state(7);
+            double r = state(8);
+            return (Eigen::Vector<double,9>()<<
                 px + vx*delta_t + r*w*cos(th)*delta_t,
                 py + vy*delta_t + r*w*sin(th)*delta_t,
                 pz + vz*delta_t,
@@ -102,47 +102,47 @@ namespace ArmorFilter
                 vz,
                 th + w*delta_t,
                 w,
-                r;
+                r).finished();
         }
 
         //state: [px,py,pz,vx,vy,vz,theta,omega,radius]^T
-        cv::Mat F(cv::Mat state,double delta_t = dt)
+        Eigen::Matrix<double,9,9> f_jacobian(Eigen::Vector<double,9> state , double delta_t = dt)
         {
-            double px = state.at<double>(0);
-            double py = state.at<double>(1);
-            double pz = state.at<double>(2);
-            double vx = state.at<double>(3);
-            double vy = state.at<double>(4);
-            double vz = state.at<double>(5);
-            double th = state.at<double>(6);
-            double w = state.at<double>(7);
-            double r = state.at<double>(8);
-            return cv::Mat_<double>(9,9)<<
-                1,0,0,delta_t,0,0,(-r*w*sin(th))*delta_t, (r*cos(th))*delta_t, (w*cos(th))*delta_t,
-                0,1,0,0,delta_t,0,( r*w*cos(th))*delta_t, (r*sin(th))*delta_t, (w*sin(th))*delta_t,
-                0,0,1,0,0,delta_t,0,0,0,
-                0,0,0,1,0,0,(-r*w*sin(th)), (r*cos(th)), (w*cos(th)),
-                0,0,0,0,1,0,( r*w*cos(th)), (r*sin(th)), (w*sin(th)),
-                0,0,0,0,0,1,0,0,0,
-                0,0,0,0,0,0,1,delta_t,0,
-                0,0,0,0,0,0,0,1,0,
-                0,0,0,0,0,0,0,0,1;
+            double px = state(0);
+            double py = state(1);
+            double pz = state(2);
+            double vx = state(3);
+            double vy = state(4);
+            double vz = state(5);
+            double th = state(6);
+            double w = state(7);
+            double r = state(8);
+            return (Eigen::Matrix<double,9,9>()<<
+                    1,0,0,delta_t,0,0,(-r*w*sin(th))*delta_t, (r*cos(th))*delta_t, (w*cos(th))*delta_t,
+                    0,1,0,0,delta_t,0,( r*w*cos(th))*delta_t, (r*sin(th))*delta_t, (w*sin(th))*delta_t,
+                    0,0,1,0,0,delta_t,0,0,0,
+                    0,0,0,1,0,0,(-r*w*sin(th)), (r*cos(th)), (w*cos(th)),
+                    0,0,0,0,1,0,( r*w*cos(th)), (r*sin(th)), (w*sin(th)),
+                    0,0,0,0,0,1,0,0,0,
+                    0,0,0,0,0,0,1,delta_t,0,
+                    0,0,0,0,0,0,0,1,0,
+                    0,0,0,0,0,0,0,0,1).finished();
         }
 
         //measurement: [px,py,pz,theta]^T
-        cv::Mat measurementMatrix = (cv::Mat_<double>(4,9) <<
+        Eigen::Matrix<double,4,9> measurementMatrix2D = (Eigen::Matrix<double,4,9>() <<
             1,0,0,0,0,0,0,0,0,
             0,1,0,0,0,0,0,0,0,
             0,0,1,0,0,0,0,0,0,
-            0,0,0,0,0,0,1,0,0);
+            0,0,0,0,0,0,1,0,0).finished();
 
-        cv::Mat measurementNoiseCov = (cv::Mat_<double>(4,4) <<
+        Eigen::Matrix<double,4,4> measurementNoiseCov = (Eigen::Matrix<double,4,4>() <<
             10,0,0,0,
             0,10,0,0,
             0,0,25,0,
-            0,0,0,(2.0f/180.0f)*CV_PI); //角度标准差2度
+            0,0,0,(2.0f/180.0f)*CV_PI).finished(); //角度标准差2度
 
-        cv::Mat processNoiseCov = (cv::Mat_<double>(9,9) <<
+        Eigen::Matrix<double,9,9> processNoiseCov = (Eigen::Matrix<double,9,9>() <<
             1,0,0,0,0,0,0,0,0,
             0,1,0,0,0,0,0,0,0,
             0,0,100,0,0,0,0,0,0,
@@ -151,10 +151,53 @@ namespace ArmorFilter
             0,0,0,0,0,100,0,0,0,
             0,0,0,0,0,0,1,0,0,
             0,0,0,0,0,0,0,1,0,
-            0,0,0,0,0,0,0,0,50);
+            0,0,0,0,0,0,0,0,50).finished();
     }
 
 }
+
+//N为状态维度，M为观测维度
+template<size_t N, size_t M>
+class ExtendKalmanFilter
+{
+public:
+    Eigen::Vector<double,N> PredictAndUpdate(Eigen::Vector<double,M> const& z,double dt)
+    {
+        //计算state先验值
+        Eigen::Vector<double,N> state_pre = f_(state_,dt);
+        Eigen::Matrix<double,N,N> F = F_(state_,dt);
+        //计算协方差P的先验值
+        Eigen::Matrix<double,N,N> P_pre = F*P_*F.transpose() + Q_;
+        // 计算新息 (Innovation) y = z_k - H * x_k|k-1
+        Eigen::Vector<double,M> y = z - H_ * state_pre;
+        // 计算新息协方差 S = H * P_k|k-1 * H^T + R
+        Eigen::Matrix<double,M,M> S = H_ * P_pre * H_.transpose() + R_;
+        //计算卡尔曼增益 K = P_k|k-1 * H^T * S^-1
+        Eigen::Matrix<double,N,M> K = P_pre * H_.transpose() * S.inverse();
+        //计算后验状态（修正后的状态）x_k|k = x_k|k-1 + K * y
+        state_ = state_pre + K * y;
+        // 更新后验协方差 P_k|k
+        Eigen::Matrix<double,N,N> I = Eigen::Matrix<double,N,N>::Identity();
+        // 使用 Joseph 形式更新 P，数值稳定性更好
+        P_ = (I - K * H_) * P_pre * (I - K * H_).transpose() + K * R_ * K.transpose();
+        return state_;
+    }
+private:
+    Eigen::Vector<double,N> state_;
+    //观测矩阵
+    Eigen::Matrix<double,M,N> H_;
+    //协方差矩阵
+    Eigen::Matrix<double,N,N> P_;
+    //过程噪声协方差矩阵
+    Eigen::Matrix<double,N,N> Q_;
+    //测量噪声协方差矩阵
+    Eigen::Matrix<double,M,M> R_;
+
+    //状态更新非线性函数f
+    std::function<Eigen::Vector<double,N>(Eigen::Vector<double,N>,double)> f_;
+    //状态更新函数f的雅可比矩阵
+    std::function<Eigen::Matrix<double,N,N>(Eigen::Vector<double,N>,double)> F_;
+};
 
 class KalmanFilter
 {
@@ -319,45 +362,6 @@ private:
     cv::Mat H_;
     cv::Mat Q_;
     cv::Mat R_;
-};
-
-class ExtendKalmanFilter
-{
-public:
-    cv::Mat PredictAndUpdate(const cv::Mat& z)
-    {
-        //计算state先验值
-        cv::Mat state_pre = f_(state_,dt);
-        cv::Mat F = F_(state_,dt);
-        //计算协方差P的先验值
-        cv::Mat P_pre = F*P_*F.t() + Q_;
-        //计算Kalman Gain
-        cv::Mat K = (P_pre*H_.t())*(H_*P_pre*H_.t() + R_);
-        //计算后验state
-        cv::Mat state = state_pre + K * (z - H_* state_pre);
-        //更新P_
-        cv::Mat I = cv::Mat::eye(P_.rows, P_.cols, P_.type());
-        // 更新P_ (推荐Joseph form)
-        P_ = (I - K * H_) * P_pre * (I - K * H_).t() + K * R_ * K.t();
-        return state_;
-    }
-private:
-    double dt;
-
-    cv::Mat state_;
-    //观测矩阵
-    cv::Mat H_;
-    //协方差矩阵
-    cv::Mat P_;
-    //观测噪声协方差矩阵
-    cv::Mat Q_;
-    //测量噪声协方差矩阵
-    cv::Mat R_;
-
-    //状态更新非线性函数f
-    std::function<cv::Mat(cv::Mat,double)> f_;
-    //状态更新函数f的雅可比矩阵
-    std::function<cv::Mat(cv::Mat,double)> F_;
 };
 
 #endif
