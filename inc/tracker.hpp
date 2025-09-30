@@ -52,9 +52,11 @@ namespace ArmorTracker
 
             Eigen::Vector<double,9> state_merged = ekf_.PredictAndUpdate(measurement, dt);
 
-            std::cout<< armor_.tvec_world.t() <<"w,r:" << armor_.w << "," << armor_.r <<"theta: "<< armor_.angle_world << std::endl;
+            // std::cout<< armor_.tvec_world.t() <<"w,r:" << armor_.w << "," << armor_.r <<"theta: "<< armor_.angle_world << std::endl;
             
+            int id_car = armor_.id_car;
             armor_ = detectedArmor;
+            armor_.id_car = id_car; //保持装甲板的车牌号不变
             armor_.tvec_world.at<double>(0) = state_merged(0);
             armor_.tvec_world.at<double>(1) = state_merged(1);
             armor_.tvec_world.at<double>(2) = state_merged(2);

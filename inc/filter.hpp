@@ -60,7 +60,7 @@ namespace ArmorFilter
     namespace EKF
     {
         //state: [px,py,pz,vx,vy,vz,theta,omega,radius]^T
-        Eigen::Vector<double,9> f(Eigen::Vector<double,9> state , double delta_t = dt)
+        Eigen::Vector<double,9> f(Eigen::Vector<double,9> state , double delta_t)
         {
             double px = state(0);
             double py = state(1);
@@ -84,7 +84,7 @@ namespace ArmorFilter
         }
 
         //state: [px,py,pz,vx,vy,vz,theta,omega,radius]^T
-        Eigen::Matrix<double,9,9> f_jacobian(Eigen::Vector<double,9> state , double delta_t = dt)
+        Eigen::Matrix<double,9,9> f_jacobian(Eigen::Vector<double,9> state , double delta_t)
         {
             double px = state(0);
             double py = state(1);
@@ -116,17 +116,17 @@ namespace ArmorFilter
 
         Eigen::Matrix<double,4,4> measurementNoiseCov = (Eigen::Matrix<double,4,4>() <<
             10,0,0,0,
-            0,10,0,0,
-            0,0,25,0,
+            0,20,0,0,
+            0,0,10,0,
             0,0,0,(2.0f/180.0f)*CV_PI).finished(); //角度标准差2度
 
         Eigen::Matrix<double,9,9> processNoiseCov = (Eigen::Matrix<double,9,9>() <<
             1,0,0,0,0,0,0,0,0,
-            0,1,0,0,0,0,0,0,0,
-            0,0,100,0,0,0,0,0,0,
+            0,100,0,0,0,0,0,0,0,
+            0,0,10,0,0,0,0,0,0,
             0,0,0,10,0,0,0,0,0,
-            0,0,0,0,10,0,0,0,0,
-            0,0,0,0,0,100,0,0,0,
+            0,0,0,0,100,0,0,0,0,
+            0,0,0,0,0,10,0,0,0,
             0,0,0,0,0,0,1,0,0,
             0,0,0,0,0,0,0,1,0,
             0,0,0,0,0,0,0,0,50).finished();
@@ -134,6 +134,45 @@ namespace ArmorFilter
 
 }
 
+namespace CarFilter
+{
+    Eigen::Vector<double,3> f(Eigen::Vector<double,3> state , double delta_t)
+    {
+        double th = state(0);
+        double w = state(1);
+        double r = state(2);
+        return (Eigen::Vector<double,3>()<<
+            0,// th + w*delta_t,
+            w,
+            r).finished();
+    }
+
+    Eigen::Matrix<double,3,3> f_jacobian(Eigen::Vector<double,3> state , double delta_t)
+    {
+        double th = state(0);
+        double w = state(1);
+        double r = state(2);
+        return (Eigen::Matrix<double,3,3>()<<
+                1,0,0,// 1,delta_t,0,
+                0,1,0,
+                0,0,1).finished();
+    }
+
+    Eigen::Matrix<double,3,3> measurementMatrix = (Eigen::Matrix<double,3,3>() <<
+        1,0,0,
+        0,1,0,
+        0,0,1).finished();
+
+    Eigen::Matrix<double,3,3> processNoiseCov = (Eigen::Matrix<double,3,3>() <<
+        5,0,0,
+        0,10,0,
+        0,0,25).finished();
+
+    Eigen::Matrix<double,3,3> measurementNoiseCov = (Eigen::Matrix<double,3,3>() <<
+        10,0,0,
+        0,50,0,
+        0,0,100).finished();
+}
 //N为状态维度，M为观测维度
 template<size_t N, size_t M>
 class ExtendedKalmanFilter
@@ -174,6 +213,8 @@ public:
         // std::cout<<"updated state: "<<state_.transpose()<<std::endl;
         return state_;
     }
+
+    Eigen::Vector<double,N> const& getState() const { return state_; }
 
     // 整体重置
     void resetState(Eigen::Vector<double,N> const& init_state,
