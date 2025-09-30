@@ -73,11 +73,11 @@ namespace ArmorFilter
             double r = state(8);
             return (Eigen::Vector<double,9>()<<
                 px + vx*delta_t + r*w*cos(th)*delta_t,
-                py + vy*delta_t + r*w*sin(th)*delta_t,
-                pz + vz*delta_t,
+                py + vy*delta_t,
+                pz + vz*delta_t + r*w*sin(th)*delta_t,
                 vx + r*w*cos(th),
-                vy + r*w*sin(th),
-                vz,
+                vy,
+                vz + r*w*sin(th),
                 th + w*delta_t,
                 w,
                 r).finished();
@@ -97,11 +97,11 @@ namespace ArmorFilter
             double r = state(8);
             return (Eigen::Matrix<double,9,9>()<<
                     1,0,0,delta_t,0,0,(-r*w*sin(th))*delta_t, (r*cos(th))*delta_t, (w*cos(th))*delta_t,
-                    0,1,0,0,delta_t,0,( r*w*cos(th))*delta_t, (r*sin(th))*delta_t, (w*sin(th))*delta_t,
-                    0,0,1,0,0,delta_t,0,0,0,
+                    0,1,0,0,delta_t,0,0,0,0,
+                    0,0,1,0,0,delta_t,( r*w*cos(th))*delta_t, (r*sin(th))*delta_t, (w*sin(th))*delta_t,
                     0,0,0,1,0,0,(-r*w*sin(th)), (r*cos(th)), (w*cos(th)),
-                    0,0,0,0,1,0,( r*w*cos(th)), (r*sin(th)), (w*sin(th)),
-                    0,0,0,0,0,1,0,0,0,
+                    0,0,0,0,1,0,0,0,0,
+                    0,0,0,0,0,1,( r*w*cos(th)), (r*sin(th)), (w*sin(th)),
                     0,0,0,0,0,0,1,delta_t,0,
                     0,0,0,0,0,0,0,1,0,
                     0,0,0,0,0,0,0,0,1).finished();

@@ -52,8 +52,8 @@ namespace ArmorTracker
 
             Eigen::Vector<double,9> state_merged = ekf_.PredictAndUpdate(measurement, dt);
 
-            // std::cout<<"estimated state: " << state_merged.transpose() << std::endl;
-
+            std::cout<< armor_.tvec_world.t() <<"w,r:" << armor_.w << "," << armor_.r <<"theta: "<< armor_.angle_world << std::endl;
+            
             armor_ = detectedArmor;
             armor_.tvec_world.at<double>(0) = state_merged(0);
             armor_.tvec_world.at<double>(1) = state_merged(1);

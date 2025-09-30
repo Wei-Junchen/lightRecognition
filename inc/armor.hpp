@@ -177,8 +177,8 @@ public:
         // cv::namedWindow("box_image" + std::to_string(id), cv::WINDOW_NORMAL);
         // cv::imshow("box_image" + std::to_string(id), box_image);
 
-        Transformation::solvePnP(std::vector<cv::Point2d>{(lights[0].vertices[0] + lights[0].vertices[1])/2.0,lights[0].center,(lights[0].vertices[3]+lights[0].vertices[2])/2.0,
-                                                            (lights[1].vertices[0] + lights[1].vertices[1])/2.0,lights[1].center,(lights[1].vertices[3]+lights[1].vertices[2])/2.0},
+        Transformation::solvePnP(std::vector<cv::Point2d>{(lights[0].vertices[0] + lights[0].vertices[1])/2.0,(lights[0].vertices[3]+lights[0].vertices[2])/2.0,
+                                                            (lights[1].vertices[0] + lights[1].vertices[1])/2.0,(lights[1].vertices[3]+lights[1].vertices[2])/2.0},
                                  rvec, tvec);
 
         //计算装甲板距离
@@ -188,7 +188,7 @@ public:
         // std::cout<<"rmat_world:"<<std::endl<<rmat_world<<std::endl;
         //计算世界系下的rvec的x分量的指向
         cv::Mat armor_x = rmat_world.inv() * (cv::Mat_<double>(3,1) << 1.0, 0.0, 0.0);
-        angle_world = std::atan2(armor_x.at<double>(2,0), armor_x.at<double>(0,0)) * 180.0 / CV_PI;
+        angle_world = -std::atan2(armor_x.at<double>(2,0), armor_x.at<double>(0,0)) * 180.0 / CV_PI;
         //预测
         // std::cout<<"angle_world: "<<angle_world<<std::endl;
     } 
