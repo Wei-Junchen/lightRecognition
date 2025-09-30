@@ -64,6 +64,8 @@ public:
                         car.armors_[i] = armor.getArmor();
                         car.armors_[i].id_car = i;
                         car.isTracked_[i] = true;
+                        car.w = armor.getArmor().w;
+                        car.r = armor.getArmor().r;
                         if(armor.getArmor().getCenter().x < carsLeftRight[&car - &cars[0]].x)
                             carsLeftRight[&car - &cars[0]].x = armor.getArmor().getCenter().x;
                         if(armor.getArmor().getCenter().x > carsLeftRight[&car - &cars[0]].y)
@@ -83,7 +85,7 @@ public:
         }
         for(auto& armor:trackedArmors)
         {
-            if(armor.getFollowCount() < 3 && !armor.isCatored) //至少跟踪2帧以上
+            if(armor.getFollowCount() < 2 && !armor.isCatored) //至少跟踪2帧以上
                 continue;
             bool isCatored = false;
             for(auto& car:cars)
@@ -93,7 +95,12 @@ public:
                     isCatored = true;
                     if(!armor.isCatored) //同一辆车最多4块装甲板
                     {
-                        // std::cout<<"Car id " << car.id_ << " found armor id " << armor.getArmor().getId() << " center: " << armor.getArmor().getCenter() << std::endl;
+                        Eigen::VectorXd state_values(2);
+                        state_values << car.w, car.r;
+                        std::cout<<"w:"<<car.w<<" r:"<<car.r<<std::endl;
+                        Eigen::VectorXd covariances(2);
+                        covariances << 20, 200;
+                        armor.ekf_.resetPartialState({7,8}, state_values, covariances);
                         //与上一块装甲板的像素x位置进行比较
                         //如果新的装甲板x大于上一块装甲板x，则说明新的装甲板在右侧
                         if(car.x_max < armor.getArmor().getCenter().x)
@@ -174,7 +181,11 @@ private:
     bool isLost_ = false; //是否丢失
     double x_min;
     double x_max;
+
     cv::Vec3d center_;  //车体中心矢量
+
+    double w; //车体旋转角速度
+    double r; //车体旋转半径
 };
 
 #endif

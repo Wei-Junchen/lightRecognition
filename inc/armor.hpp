@@ -190,7 +190,7 @@ public:
         cv::Mat armor_x = rmat_world.inv() * (cv::Mat_<double>(3,1) << 1.0, 0.0, 0.0);
         angle_world = std::atan2(armor_x.at<double>(2,0), armor_x.at<double>(0,0)) * 180.0 / CV_PI;
         //预测
-        std::cout<<"angle_world: "<<angle_world<<std::endl;
+        // std::cout<<"angle_world: "<<angle_world<<std::endl;
     } 
     //获取装甲板ID，使用CNN识别，用DNN导入模型
     int getId() const
@@ -222,8 +222,10 @@ private:
     cv::Mat tvec;   //平移向量
     double center_distance;
     inline static size_t totalArmor = 0; //总识别到的装甲板数
-    double vx = 0.0, vy = 0.0, vz = 0.0; //速度
 
+    double vx = 0.0, vy = 0.0, vz = 0.0; //速度
+    double w; //角速度
+    double r; //转弯半径
     cv::Point3d predict_position; //预测位置
     cv::Mat tvec_world; //世界坐标系下的tvec
     cv::Mat rmat_world; //世界坐标系下的旋转矩阵

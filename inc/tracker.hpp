@@ -6,6 +6,7 @@
 #include <vector>
 #include <queue>
 #include <Eigen/Dense>
+#include <chrono>
 
 namespace Shooter { class CapableTrajectory; }
 class Car;
@@ -26,7 +27,7 @@ namespace ArmorTracker
         static void predictTrackedArmors(double dt);
 
         TrackedArmor(const Armor& armor) : 
-            armor_(armor),lostCount_(0),
+            armor_(armor),lostCount_(0),last_time_(std::chrono::steady_clock::now()),
             ekf_(Eigen::Vector<double,9>((Eigen::Vector<double,9>() 
             <<  armor.tvec_world.at<double>(0),
                 armor.tvec_world.at<double>(1),
@@ -37,25 +38,22 @@ namespace ArmorTracker
                 armor.angle_world,0,0).finished())) { absolute_id_ = ++global_id_; }
         ~TrackedArmor() = default;
 
-        void update(const Armor& detectedArmor,double dt = 0.02)
+        void update(const Armor& detectedArmor)
         {
-            lostCount_ = 0; //重置丢失计数器
-            if(followCount_ >= 2)
-                recent_ids_.push(detectedArmor.id);
-            if(recent_ids_.size() > 10) //只保留最近10个
-                recent_ids_.pop();
-
+            lostCount_ = 0; //重置丢失计数器S
             Eigen::Vector<double,4> measurement = (Eigen::Vector<double,4>() << 
                 detectedArmor.tvec_world.at<double>(0),
                 detectedArmor.tvec_world.at<double>(1),
                 detectedArmor.tvec_world.at<double>(2),
                 detectedArmor.angle_world).finished();
 
+            double dt = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - last_time_).count();
+            last_time_ = std::chrono::steady_clock::now();
+
             Eigen::Vector<double,9> state_merged = ekf_.PredictAndUpdate(measurement, dt);
 
             // std::cout<<"estimated state: " << state_merged.transpose() << std::endl;
 
-            int tmpid = armor_.id_car;
             armor_ = detectedArmor;
             armor_.tvec_world.at<double>(0) = state_merged(0);
             armor_.tvec_world.at<double>(1) = state_merged(1);
@@ -63,17 +61,9 @@ namespace ArmorTracker
             armor_.vx = state_merged(3);
             armor_.vy = state_merged(4);
             armor_.vz = state_merged(5);
-
-            armor_.id_car = tmpid;
-            // 计算recent_ids_队列中众数
-            std::queue<int> temp = recent_ids_;
-            std::map<int, int> freq_map;
-            while (!temp.empty()) {
-                freq_map[temp.front()]++;
-                temp.pop();
-            }
-            armor_.id = (freq_map.size() > 0) ? std::max_element(freq_map.begin(), freq_map.end(),
-                [](const auto& a, const auto& b) { return a.second < b.second; })->first : detectedArmor.id;
+            armor_.angle_world = state_merged(6);
+            armor_.w = state_merged(7);
+            armor_.r = state_merged(8);
         }
         
         int getLostCount() const { return lostCount_; }
@@ -90,12 +80,14 @@ namespace ArmorTracker
         int getAbsoluteId() const { return absolute_id_; }
     private:
         ExtendedKalmanFilter<9, 4> ekf_;
-        int lostCount_; //丢失计数器
+        std::chrono::steady_clock::time_point last_time_;
         Armor armor_;
+        
         bool isCatored = false; //是否被车体关联
+        int lostCount_; //丢失计数器
         int followCount_ = 0; //跟踪计数器
-        std::queue<int> recent_ids_; //最近跟踪到的装甲板ID队列
         int absolute_id_; //全局唯一ID
+
         static inline int maxLostCount = 1; //最大丢失计数器
         static inline int global_id_ = 0; //全局唯一ID计数器
     };
@@ -127,7 +119,7 @@ namespace ArmorTracker
                 cv::Point2f predict_center(tracked.armor_.box.center.x, tracked.armor_.box.center.y);
                 double distance = cv::norm(predict_center - detectedArmors[i].box.center);
                 // std::cout<<"distance: " << distance << std::endl;
-                if(distance < min_distance)
+                if(distance < min_distance && tracked.armor_.id == detectedArmors[i].id)
                 {
                     min_distance = distance;
                     min_index = i;
@@ -170,8 +162,8 @@ namespace ArmorTracker
         for(auto& tracked : trackedArmors)
         {
             tracked.armor_.predict_position = cv::Point3f(tracked.armor_.tvec_world.at<double>(0) + tracked.armor_.vx * dt,
-                                                    tracked.armor_.tvec_world.at<double>(1) + tracked.armor_.vy * dt,
-                                                    tracked.armor_.tvec_world.at<double>(2) + tracked.armor_.vz * dt);
+                                                        tracked.armor_.tvec_world.at<double>(1) + tracked.armor_.vy * dt,
+                                                        tracked.armor_.tvec_world.at<double>(2) + tracked.armor_.vz * dt);
         }
     }
 }

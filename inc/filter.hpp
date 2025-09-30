@@ -57,28 +57,6 @@ namespace ArmorFilter
         return Qf;
     }
 
-
-    //定义二维平面滤波器
-    cv::Mat transitionMatrix2D = (cv::Mat_<double>(4,4) <<
-        1,0,1,0,
-        0,1,0,1,
-        0,0,1,0,
-        0,0,0,1);
-
-    cv::Mat measurementMatrix2D = (cv::Mat_<double>(2,4) <<
-        1,0,0,0,
-        0,1,0,0);
-
-    cv::Mat measurementNoiseCov2D = (cv::Mat_<double>(2,2) <<
-        1,0,
-        0,1);
-
-    cv::Mat processNoiseCov2D = (cv::Mat_<double>(4,4) <<
-        1,0,0,0,
-        0,1,0,0,
-        0,0,1,0,
-        0,0,0,1);
-
     namespace EKF
     {
         //state: [px,py,pz,vx,vy,vz,theta,omega,radius]^T
@@ -195,6 +173,34 @@ public:
         // std::cout<<"predicted state: "<<state_pre.transpose()<<std::endl;
         // std::cout<<"updated state: "<<state_.transpose()<<std::endl;
         return state_;
+    }
+
+    // 整体重置
+    void resetState(Eigen::Vector<double,N> const& init_state,
+                    Eigen::Matrix<double,N,N> const& P_new = Eigen::Matrix<double,N,N>::Identity())
+    {
+        state_ = init_state;
+        P_ = P_new;
+    }
+
+    // 部分重置
+    void resetPartialState(const std::vector<size_t>& indices,
+                           const Eigen::VectorXd& values,
+                           const Eigen::VectorXd& variances)
+    {
+        assert(indices.size() == values.size());
+        assert(indices.size() == variances.size());
+
+        for (size_t k = 0; k < indices.size(); ++k)
+        {
+            size_t i = indices[k];
+            state_(i) = values(k);
+
+            // 协方差矩阵更新：设置新的方差，同时清除相关性
+            P_.row(i).setZero();
+            P_.col(i).setZero();
+            P_(i,i) = variances(k);
+        }
     }
 private:
     Eigen::Vector<double,N> state_;
